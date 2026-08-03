@@ -1,0 +1,27 @@
+# compiled
+/dist
+/build
+/coverage
+
+# deps
+/node_modules
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# logs / OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea
+.vscode
+*.swp
+
+# prisma
+/prisma/*.db
+/prisma/*.db-journal

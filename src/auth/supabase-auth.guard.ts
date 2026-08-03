@@ -1,0 +1,109 @@
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
+import * as jose from 'jose';
+import type { Request } from 'express';
+import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
+import { PrismaService } from '../prisma/prisma.service';
+import type { AuthUser, JwtPayload } from './auth.types';
+import type { Env } from '../config/env.schema';
+
+@Injectable()
+export class SupabaseAuthGuard implements CanActivate {
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
+    const request = context.switchToHttp().getRequest<Request & { user?: AuthUser }>();
+    const token = this.extractBearerToken(request);
+    if (!token) {
+      throw new UnauthorizedException('Missing Bearer token');
+    }
+
+    let payload: JwtPayload;
+    try {
+      const secret = new TextEncoder().encode(
+        this.config.get('SUPABASE_JWT_SECRET', { infer: true }),
+      );
+      const verified = await jose.jwtVerify(token, secret, {
+        audience: 'authenticated',
+      });
+      payload = verified.payload as JwtPayload;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    const email = payload.email?.trim().toLowerCase() || null;
+    const phone = payload.phone?.trim() || null;
+    const identityFilters = [
+      ...(email ? [{ email }] : []),
+      ...(phone ? [{ phoneNumber: phone }] : []),
+    ];
+
+    if (identityFilters.length === 0) {
+      throw new UnauthorizedException(
+        'Token is missing email and phone claims',
+      );
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { OR: identityFilters },
+      include: {
+        memberships: { select: { farmId: true } },
+        farms: { select: { id: true } },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'No HatchLog user profile found for this token',
+      );
+    }
+
+    const farmIds = Array.from(
+      new Set([
+        ...user.farms.map((farm) => farm.id),
+        ...user.memberships.map((membership) => membership.farmId),
+      ]),
+    );
+
+    request.user = {
+      id: user.id,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      farmIds,
+      supabaseSub: payload.sub,
+    };
+
+    return true;
+  }
+
+  private extractBearerToken(request: Request): string | null {
+    const header = request.headers.authorization;
+    if (!header) {
+      return null;
+    }
+    const [scheme, token] = header.split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !token) {
+      return null;
+    }
+    return token;
+  }
+}
