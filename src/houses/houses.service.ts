@@ -61,6 +61,7 @@ export class HousesService {
     }
     return this.prisma.house.create({
       data: {
+        ...(dto.id ? { id: dto.id } : {}),
         name: dto.name.trim(),
         capacity: dto.capacity,
         isIsolation: dto.isIsolation ?? false,

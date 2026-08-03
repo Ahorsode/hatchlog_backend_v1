@@ -13,7 +13,8 @@ export class AdminApiKeyGuard implements CanActivate {
   private readonly apiKey: string;
 
   constructor(private readonly config: ConfigService<Env, true>) {
-    this.apiKey = this.config.get('HATCHLOG_ADMIN_API_KEY', { infer: true }) || '';
+    this.apiKey =
+      this.config.get('HATCHLOG_ADMIN_API_KEY', { infer: true }) || '';
   }
 
   canActivate(context: ExecutionContext): boolean {

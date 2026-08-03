@@ -67,6 +67,7 @@ export class LivestockService {
 
     return this.prisma.livestock.create({
       data: {
+        ...(dto.id ? { id: dto.id } : {}),
         houseId: dto.houseId,
         farmId: dto.farm_id,
         breedType: dto.breedType,

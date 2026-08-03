@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AdminModule } from './admin/admin.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditModule } from './audit/audit.module';
@@ -14,6 +15,7 @@ import { EggsModule } from './eggs/eggs.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { FarmsModule } from './farms/farms.module';
 import { FeedingModule } from './feeding/feeding.module';
+import { GrowthStandardsModule } from './growth-standards/growth-standards.module';
 import { HealthModule } from './health/health.module';
 import { HealthDomainModule } from './health-domain/health-domain.module';
 import { HousesModule } from './houses/houses.module';
@@ -26,6 +28,7 @@ import { MortalityModule } from './mortality/mortality.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RemindersModule } from './reminders/reminders.module';
 import { SalesModule } from './sales/sales.module';
 import { StatementsModule } from './statements/statements.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
@@ -41,6 +44,7 @@ import { redisConnectionFromUrl } from './workers/redis.config';
       isGlobal: true,
       validate: validateEnv,
     }),
+    ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({
@@ -50,6 +54,7 @@ import { redisConnectionFromUrl } from './workers/redis.config';
       }),
     }),
     PrismaModule,
+    RemindersModule,
     CommonModule,
     AuthModule,
     HealthModule,
@@ -62,6 +67,7 @@ import { redisConnectionFromUrl } from './workers/redis.config';
     MortalityModule,
     IsolationModule,
     EggCategoriesModule,
+    GrowthStandardsModule,
     FarmsModule,
     TeamModule,
     InventoryModule,

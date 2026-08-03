@@ -1,13 +1,11 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
 import { assertFarmAccess } from '../common/farm-access';
 import type {
   CreateSupplierDto,
   FarmScopedQueryDto,
   UpdateSupplierBalanceDto,
+  UpdateSupplierDto,
 } from '../common/dto/domain.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -29,6 +27,17 @@ export class SuppliersService {
       ...s,
       balanceOwed: Number(s.balanceOwed),
     }));
+  }
+
+  async getById(user: AuthUser, id: string, farmId: string) {
+    assertFarmAccess(user, farmId);
+
+    const supplier = await this.prisma.supplier.findFirst({
+      where: { id, farmId },
+    });
+    if (!supplier) throw new NotFoundException('Supplier not found');
+
+    return { ...supplier, balanceOwed: Number(supplier.balanceOwed) };
   }
 
   async getStats(user: AuthUser, id: string, farmId: string) {
@@ -71,6 +80,45 @@ export class SuppliersService {
         email: dto.email,
         address: dto.address,
         balanceOwed: dto.balanceOwed ?? 0,
+      },
+    });
+
+    return { ...supplier, balanceOwed: Number(supplier.balanceOwed) };
+  }
+
+  async update(user: AuthUser, id: string, dto: UpdateSupplierDto) {
+    const farmId = dto.farm_id;
+    if (!farmId) {
+      const existing = await this.prisma.supplier.findUnique({ where: { id } });
+      if (!existing) throw new NotFoundException('Supplier not found');
+      assertFarmAccess(user, existing.farmId);
+      return this.applyUpdate(id, existing.farmId, dto);
+    }
+
+    assertFarmAccess(user, farmId);
+    return this.applyUpdate(id, farmId, dto);
+  }
+
+  private async applyUpdate(
+    id: string,
+    farmId: string,
+    dto: UpdateSupplierDto,
+  ) {
+    const existing = await this.prisma.supplier.findFirst({
+      where: { id, farmId },
+    });
+    if (!existing) throw new NotFoundException('Supplier not found');
+
+    const supplier = await this.prisma.supplier.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.email !== undefined ? { email: dto.email } : {}),
+        ...(dto.address !== undefined ? { address: dto.address } : {}),
+        ...(dto.balanceOwed !== undefined
+          ? { balanceOwed: dto.balanceOwed }
+          : {}),
       },
     });
 

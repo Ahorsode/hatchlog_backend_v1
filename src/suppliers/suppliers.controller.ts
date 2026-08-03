@@ -15,6 +15,7 @@ import {
   CreateSupplierDto,
   FarmScopedQueryDto,
   UpdateSupplierBalanceDto,
+  UpdateSupplierDto,
 } from '../common/dto/domain.dto';
 import { SuppliersService } from './suppliers.service';
 
@@ -42,6 +43,17 @@ export class SuppliersController {
     return this.suppliersService.getStats(user, id, query.farm_id);
   }
 
+  @Get(':id')
+  @RequireFarmPermission('customers', 'view')
+  @ApiOkResponse({ description: 'Get supplier by id' })
+  getById(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query() query: FarmScopedQueryDto,
+  ) {
+    return this.suppliersService.getById(user, id, query.farm_id);
+  }
+
   @Post()
   @RequireFarmPermission('customers', 'edit')
   @ApiOkResponse({ description: 'Create supplier' })
@@ -49,14 +61,25 @@ export class SuppliersController {
     return this.suppliersService.create(user, body);
   }
 
-  @Patch(':id')
+  @Patch(':id/balance')
   @RequireFarmPermission('customers', 'edit')
-  @ApiOkResponse({ description: 'Update supplier balance' })
+  @ApiOkResponse({ description: 'Increment supplier balance' })
   updateBalance(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: UpdateSupplierBalanceDto,
   ) {
     return this.suppliersService.updateBalance(user, id, body);
+  }
+
+  @Patch(':id')
+  @RequireFarmPermission('customers', 'edit')
+  @ApiOkResponse({ description: 'Update supplier profile' })
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: UpdateSupplierDto,
+  ) {
+    return this.suppliersService.update(user, id, body);
   }
 }

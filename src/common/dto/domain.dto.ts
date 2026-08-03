@@ -4,7 +4,6 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
-  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -29,6 +28,13 @@ export class FarmScopedQueryDto {
 }
 
 export class CreateHouseDto {
+  @ApiPropertyOptional({
+    description: 'Client-generated id for offline-first sync',
+  })
+  @IsOptional()
+  @IsString()
+  id?: string;
+
   @ApiProperty()
   @IsString()
   farm_id!: string;
@@ -58,6 +64,13 @@ export class UpdateHouseDto extends PartialType(CreateHouseDto) {
 }
 
 export class CreateLivestockDto {
+  @ApiPropertyOptional({
+    description: 'Client-generated id for offline-first sync',
+  })
+  @IsOptional()
+  @IsString()
+  id?: string;
+
   @ApiProperty()
   @IsString()
   farm_id!: string;
@@ -483,6 +496,60 @@ export class CreateEggCategoryDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  sellingPrice?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  unitSize?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isStockInternal?: boolean;
+}
+
+export class UpdateEggCategoryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  farm_id?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  sellingPrice?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  unitSize?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isStockInternal?: boolean;
 }
 
 // ── Feed Formulations ──
@@ -521,7 +588,9 @@ export class CreateFeedFormulationDto {
   @MinLength(1)
   name!: string;
 
-  @ApiProperty({ enum: ['PRE_STARTER', 'STARTER', 'GROWER', 'FINISHER', 'BREEDER', 'CUSTOM'] })
+  @ApiProperty({
+    enum: ['PRE_STARTER', 'STARTER', 'GROWER', 'FINISHER', 'BREEDER', 'CUSTOM'],
+  })
   @IsString()
   type!: string;
 
@@ -658,7 +727,9 @@ export class CreateInvitationDto {
   @IsString()
   phoneNumber?: string;
 
-  @ApiProperty({ enum: ['MANAGER', 'WORKER', 'ACCOUNTANT', 'FINANCE_OFFICER', 'CASHIER'] })
+  @ApiProperty({
+    enum: ['MANAGER', 'WORKER', 'ACCOUNTANT', 'FINANCE_OFFICER', 'CASHIER'],
+  })
   @IsString()
   role!: string;
 }
@@ -668,7 +739,9 @@ export class UpdateMemberRoleDto {
   @IsString()
   farm_id!: string;
 
-  @ApiProperty({ enum: ['MANAGER', 'WORKER', 'ACCOUNTANT', 'FINANCE_OFFICER', 'CASHIER'] })
+  @ApiProperty({
+    enum: ['MANAGER', 'WORKER', 'ACCOUNTANT', 'FINANCE_OFFICER', 'CASHIER'],
+  })
   @IsString()
   role!: string;
 }
@@ -959,6 +1032,40 @@ export class CreateSupplierDto {
   @IsString()
   @MinLength(1)
   name!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  balanceOwed?: number;
+}
+
+export class UpdateSupplierDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  farm_id?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  name?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -1558,6 +1665,23 @@ export class MortalityTrendsQueryDto {
   @IsString()
   @MinLength(1)
   farm_id!: string;
+}
+
+export class ComprehensiveReportQueryDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  farm_id!: string;
+
+  @ApiProperty({ description: 'ISO start date' })
+  @IsString()
+  @MinLength(1)
+  start_date!: string;
+
+  @ApiProperty({ description: 'ISO end date' })
+  @IsString()
+  @MinLength(1)
+  end_date!: string;
 }
 
 // ── Trash ──

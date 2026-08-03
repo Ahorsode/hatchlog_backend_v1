@@ -18,4 +18,14 @@ export class DashboardController {
   stats(@CurrentUser() user: AuthUser, @Query() query: DashboardQueryDto) {
     return this.service.getStats(user, query.farm_id);
   }
+
+  @Get('monthly-summary')
+  @RequireFarmPermission('batches', 'view')
+  @ApiOkResponse({ description: 'Current-month revenue, expenses, eggs' })
+  monthlySummary(
+    @CurrentUser() user: AuthUser,
+    @Query() query: DashboardQueryDto,
+  ) {
+    return this.service.getMonthlySummary(user, query.farm_id);
+  }
 }

@@ -156,15 +156,57 @@ export class DashboardService {
     };
   }
 
+  async getMonthlySummary(user: AuthUser, farmId: string) {
+    assertFarmAccess(user, farmId);
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const [sales, expenses, eggs] = await Promise.all([
+      this.prisma.sale.aggregate({
+        where: {
+          farmId,
+          isDeleted: false,
+          saleDate: { gte: monthStart },
+        },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: {
+          farmId,
+          isDeleted: false,
+          expenseDate: { gte: monthStart },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.eggProduction.aggregate({
+        where: {
+          farmId,
+          logDate: { gte: monthStart },
+        },
+        _sum: { eggsCollected: true },
+      }),
+    ]);
+
+    return {
+      revenue: Number(sales._sum.totalAmount || 0),
+      expenses: Number(expenses._sum.amount || 0),
+      eggs: eggs._sum.eggsCollected || 0,
+    };
+  }
+
   private buildDailySeries(
-    records: any[],
+    records: Array<Record<string, unknown>>,
     dateKey: string,
     valueKey: string,
     startDate: Date,
   ) {
     const map = new Map<string, number>();
     for (const record of records) {
-      const date = new Date(record[dateKey]).toISOString().split('T')[0];
+      const date = new Date(String(record[dateKey]))
+        .toISOString()
+        .split('T')[0];
       map.set(date, (map.get(date) || 0) + Number(record[valueKey] || 0));
     }
 
