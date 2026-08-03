@@ -45,6 +45,17 @@ docker compose up --build
 
 Phase 1 handlers: `egg_collection`, `feed_usage`, `mortality`.
 
+### Client auth
+
+| Client | Auth |
+|--------|------|
+| Flutter mobile/desktop | `Authorization: Bearer <supabase_access_token>` |
+| Next.js Server Actions | `X-HatchLog-Api-Key` + `X-HatchLog-User-Id` |
+
+Set the same `HATCHLOG_INTERNAL_API_KEY` in `hatchlog_backend/.env` and `poultry-pms/.env`.
+
+Flutter apps use `HATCHLOG_API_URL` (Android emulator: `http://10.0.2.2:3001`, desktop/web: `http://localhost:3001`).
+
 ## Scripts
 
 | Script | Description |

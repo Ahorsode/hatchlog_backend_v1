@@ -49,6 +49,13 @@ export class EggCollectionHandler implements EntityHandler {
       new Date(),
     );
 
+    const categoryId = asString(payload.category_id || payload.categoryId) || null;
+    const unusableCount = Math.round(asNumber(payload.unusable_count));
+    const eggsRemaining = Math.max(
+      eggsCollected - unusableCount,
+      asNumber(payload.eggs_remaining, eggsCollected - unusableCount),
+    );
+
     await this.prisma.eggProduction.upsert({
       where: { id: mutation.client_id },
       create: {
@@ -58,8 +65,9 @@ export class EggCollectionHandler implements EntityHandler {
         userId: context.userId,
         eggsCollected,
         cratesCollected: crates,
-        eggsRemaining: eggsCollected,
-        unusableCount: Math.round(asNumber(payload.unusable_count)),
+        eggsRemaining,
+        categoryId,
+        unusableCount,
         qualityGrade: asString(payload.quality_grade) || null,
         isSorted: asBool(payload.is_sorted),
         smallCount: Math.round(asNumber(payload.small_count)),
@@ -75,8 +83,9 @@ export class EggCollectionHandler implements EntityHandler {
         userId: context.userId,
         eggsCollected,
         cratesCollected: crates,
-        eggsRemaining: eggsCollected,
-        unusableCount: Math.round(asNumber(payload.unusable_count)),
+        eggsRemaining,
+        categoryId,
+        unusableCount,
         qualityGrade: asString(payload.quality_grade) || null,
         isSorted: asBool(payload.is_sorted),
         smallCount: Math.round(asNumber(payload.small_count)),
