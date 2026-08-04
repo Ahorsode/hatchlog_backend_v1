@@ -1,8 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import {
+  OnboardFarmDto,
   UpdateFarmDto,
   UpdateFarmSettingsDto,
   UpdateSalesSettingsDto,
@@ -14,6 +19,15 @@ import { FarmsService } from './farms.service';
 @Controller('api/v1/farms')
 export class FarmsController {
   constructor(private readonly farmsService: FarmsService) {}
+
+  @Post('onboard')
+  @ApiOkResponse({
+    description:
+      'Complete farm onboarding (update placeholder farm or create one)',
+  })
+  onboard(@CurrentUser() user: AuthUser, @Body() body: OnboardFarmDto) {
+    return this.farmsService.onboard(user, body);
+  }
 
   @Get(':id')
   @ApiOkResponse({ description: 'Get farm by id' })

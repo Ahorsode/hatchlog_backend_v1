@@ -626,6 +626,27 @@ export class CreateWeightRecordDto {
 
 // ── Farm Settings ──
 
+export class OnboardFarmDto {
+  @ApiProperty()
+  @IsString()
+  name!: string;
+
+  @ApiProperty()
+  @IsString()
+  location!: string;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  capacity!: number;
+
+  /** Ignored — farm is bound to the authenticated user. Kept for web BFF compat. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  userId?: string;
+}
+
 export class UpdateFarmDto {
   @ApiPropertyOptional()
   @IsOptional()
