@@ -15,16 +15,28 @@ import type { Env } from '../config/env.schema';
 
 /**
  * Accepts either:
- * 1) Authorization: Bearer <supabase_jwt>  (Flutter clients)
+ * 1) Authorization: Bearer <supabase_jwt>  (Flutter / web clients)
  * 2) X-HatchLog-Api-Key + X-HatchLog-User-Id  (Next.js BFF)
+ *
+ * Supabase user access tokens are ES256 (JWKS). Legacy HS256 JWT secret
+ * is kept as a fallback for older tokens / local tooling.
  */
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
+  private readonly jwks: ReturnType<typeof jose.createRemoteJWKSet>;
+
   constructor(
     private readonly config: ConfigService<Env, true>,
     private readonly prisma: PrismaService,
     private readonly reflector: Reflector,
-  ) {}
+  ) {
+    const supabaseUrl = this.config
+      .get('SUPABASE_URL', { infer: true })
+      .replace(/\/$/, '');
+    this.jwks = jose.createRemoteJWKSet(
+      new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
+    );
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -52,18 +64,7 @@ export class SupabaseAuthGuard implements CanActivate {
       );
     }
 
-    let payload: JwtPayload;
-    try {
-      const secret = new TextEncoder().encode(
-        this.config.get('SUPABASE_JWT_SECRET', { infer: true }),
-      );
-      const verified = await jose.jwtVerify(token, secret, {
-        audience: 'authenticated',
-      });
-      payload = verified.payload as JwtPayload;
-    } catch {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
+    const payload = await this.verifySupabaseToken(token);
 
     const email = payload.email?.trim().toLowerCase() || null;
     const phone = payload.phone?.trim() || null;
@@ -94,6 +95,30 @@ export class SupabaseAuthGuard implements CanActivate {
 
     request.user = this.toAuthUser(user, payload.sub);
     return true;
+  }
+
+  private async verifySupabaseToken(token: string): Promise<JwtPayload> {
+    // Prefer asymmetric JWKS (current Supabase user access tokens are ES256).
+    try {
+      const verified = await jose.jwtVerify(token, this.jwks, {
+        audience: 'authenticated',
+      });
+      return verified.payload as JwtPayload;
+    } catch {
+      // Fall through to legacy HS256 JWT secret.
+    }
+
+    try {
+      const secret = new TextEncoder().encode(
+        this.config.get('SUPABASE_JWT_SECRET', { infer: true }),
+      );
+      const verified = await jose.jwtVerify(token, secret, {
+        audience: 'authenticated',
+      });
+      return verified.payload as JwtPayload;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
   }
 
   private async tryApiKeyAuth(
