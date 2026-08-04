@@ -55,8 +55,10 @@ import { redisConnectionFromUrl } from './workers/redis.config';
     }),
     PrismaModule,
     RemindersModule,
-    CommonModule,
+    // Auth must register before FarmPermissionGuard so request.user exists
+    // when permission-decorated routes run.
     AuthModule,
+    CommonModule,
     HealthModule,
     SyncModule,
     MeModule,

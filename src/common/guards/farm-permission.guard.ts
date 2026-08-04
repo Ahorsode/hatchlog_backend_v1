@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
@@ -31,7 +32,11 @@ export class FarmPermissionGuard implements CanActivate {
       Request & { user?: AuthUser }
     >();
     const user = request.user;
-    if (!user) return false;
+    if (!user) {
+      // Prefer an explicit 401 over Nest's generic "Forbidden resource"
+      // when this guard accidentally runs before auth.
+      throw new UnauthorizedException('Authentication required');
+    }
 
     const key = meta.farmIdKey || 'farm_id';
     const fromQuery = request.query?.[key];
