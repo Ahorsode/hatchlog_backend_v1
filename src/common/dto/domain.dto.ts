@@ -153,6 +153,43 @@ export class UpdateLivestockDto {
   type?: string;
 }
 
+export class LivestockOtherExpenseDto {
+  @ApiProperty()
+  @IsString()
+  label!: string;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsNumber()
+  amount!: number;
+}
+
+export class UpdateLivestockFinancialsDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  farm_id!: string;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  actualCost!: number;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  carriageInward!: number;
+
+  @ApiPropertyOptional({ type: [LivestockOtherExpenseDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LivestockOtherExpenseDto)
+  otherExpenses?: LivestockOtherExpenseDto[];
+}
+
 export class SoftDeleteDto {
   @ApiPropertyOptional()
   @IsOptional()

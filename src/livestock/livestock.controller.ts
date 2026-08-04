@@ -15,6 +15,7 @@ import {
 } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireFarmPermission } from '../common/decorators/require-farm-permission.decorator';
 import {
   CreateLivestockDto,
   CreateWeightRecordDto,
@@ -22,6 +23,7 @@ import {
   ListQueryDto,
   SoftDeleteDto,
   UpdateLivestockDto,
+  UpdateLivestockFinancialsDto,
 } from '../common/dto/domain.dto';
 import { LivestockService } from './livestock.service';
 
@@ -61,6 +63,17 @@ export class LivestockController {
   @ApiOkResponse({ description: 'Create livestock batch' })
   create(@CurrentUser() user: AuthUser, @Body() body: CreateLivestockDto) {
     return this.livestockService.create(user, body);
+  }
+
+  @Patch(':id/financials')
+  @RequireFarmPermission('finance', 'edit')
+  @ApiOkResponse({ description: 'Update batch initial investment financials' })
+  updateFinancials(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: UpdateLivestockFinancialsDto,
+  ) {
+    return this.livestockService.updateFinancials(user, id, body);
   }
 
   @Patch(':id')

@@ -11,6 +11,7 @@ import {
   ListQueryDto,
   SoftDeleteDto,
   UpdateLivestockDto,
+  UpdateLivestockFinancialsDto,
 } from '../common/dto/domain.dto';
 import { assertFarmAccess, requireDate } from '../common/farm-access';
 import { PrismaService } from '../prisma/prisma.service';
@@ -138,6 +139,40 @@ export class LivestockService {
     return this.prisma.livestock.update({
       where: { id },
       data: updateData,
+      include: { house: true },
+    });
+  }
+
+  async updateFinancials(
+    user: AuthUser,
+    id: string,
+    dto: UpdateLivestockFinancialsDto,
+  ) {
+    assertFarmAccess(user, dto.farm_id);
+
+    const existing = await this.prisma.livestock.findFirst({
+      where: { id, farmId: dto.farm_id, isDeleted: false },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Livestock batch not found');
+
+    const otherExpenses = (dto.otherExpenses || [])
+      .filter((row) => row.label?.trim())
+      .map((row) => ({
+        label: row.label.trim(),
+        amount: Number(row.amount) || 0,
+      }));
+
+    return this.prisma.livestock.update({
+      where: { id },
+      data: {
+        initialCostActual: dto.actualCost,
+        initial_actual_cost: dto.actualCost,
+        initialCostCarriage: dto.carriageInward,
+        carriage_inward: dto.carriageInward,
+        initialCostOther: otherExpenses,
+        initial_other_costs: otherExpenses,
+      },
       include: { house: true },
     });
   }
