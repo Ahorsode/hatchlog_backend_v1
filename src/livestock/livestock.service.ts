@@ -195,11 +195,11 @@ export class LivestockService {
       where: { id, farmId, isDeleted: false },
       include: {
         house: true,
-        weightRecords: { orderBy: { logDate: 'desc' }, take: 10 },
+        weightRecords: { orderBy: { logDate: 'desc' }, take: 50 },
         feedingLogs: {
           where: { isDeleted: false },
           orderBy: { logDate: 'desc' },
-          take: 10,
+          take: 50,
           include: {
             inventory: { select: { id: true, itemName: true } },
             formulation: { select: { id: true, name: true } },
@@ -208,13 +208,15 @@ export class LivestockService {
         eggProduction: {
           where: { isDeleted: false },
           orderBy: { logDate: 'desc' },
-          take: 10,
+          take: 50,
         },
         mortalityRecords: {
           where: { isDeleted: false },
           orderBy: { logDate: 'desc' },
-          take: 10,
+          take: 50,
         },
+        vaccinations: { orderBy: { scheduledDate: 'asc' }, take: 50 },
+        medications: { orderBy: { scheduledDate: 'asc' }, take: 50 },
       },
     });
     if (!batch) throw new NotFoundException('Livestock batch not found');
