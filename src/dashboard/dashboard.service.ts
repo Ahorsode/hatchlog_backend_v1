@@ -28,9 +28,9 @@ export class DashboardService {
       activeBatchesCount,
       todayMortality,
       todayEggs,
-      eggDaySums,
-      feedDaySums,
-      mortalityDaySums,
+      eggTrendRows,
+      feedTrendRows,
+      mortalityTrendRows,
       totalExpenses,
       recentOrders,
       supplierDebt,
@@ -70,34 +70,31 @@ export class DashboardService {
         where: { logDate: { gte: today }, farmId, isDeleted: false },
         _sum: { eggsCollected: true },
       }),
-      this.prisma.$queryRaw<DaySumRow[]>(Prisma.sql`
-        SELECT DATE_TRUNC('day', "logDate") AS day,
-               COALESCE(SUM("eggsCollected"), 0) AS value
-        FROM egg_production
-        WHERE "farmId" = ${farmId}
-          AND "logDate" >= ${sevenDaysAgo}
-          AND "is_deleted" = false
-        GROUP BY 1
-      `),
-      this.prisma.$queryRaw<DaySumRow[]>(Prisma.sql`
-        SELECT DATE_TRUNC('day', "log_date") AS day,
-               COALESCE(SUM("amount_consumed"), 0) AS value
-        FROM daily_feeding_logs
-        WHERE "farmId" = ${farmId}
-          AND "log_date" >= ${sevenDaysAgo}
-          AND "is_deleted" = false
-        GROUP BY 1
-      `),
-      this.prisma.$queryRaw<DaySumRow[]>(Prisma.sql`
-        SELECT DATE_TRUNC('day', "logDate") AS day,
-               COALESCE(SUM(count), 0) AS value
-        FROM mortality
-        WHERE "farmId" = ${farmId}
-          AND type = 'DEAD'
-          AND "logDate" >= ${sevenDaysAgo}
-          AND "is_deleted" = false
-        GROUP BY 1
-      `),
+      this.prisma.eggProduction.findMany({
+        where: {
+          farmId,
+          logDate: { gte: sevenDaysAgo },
+          isDeleted: false,
+        },
+        select: { logDate: true, eggsCollected: true },
+      }),
+      this.prisma.feedingLog.findMany({
+        where: {
+          farmId,
+          logDate: { gte: sevenDaysAgo },
+          isDeleted: false,
+        },
+        select: { logDate: true, amountConsumed: true },
+      }),
+      this.prisma.healthMortality.findMany({
+        where: {
+          farmId,
+          type: 'DEAD',
+          logDate: { gte: sevenDaysAgo },
+          isDeleted: false,
+        },
+        select: { logDate: true, count: true },
+      }),
       this.prisma.expense.aggregate({
         where: { farmId, isDeleted: false },
         _sum: { amount: true },
@@ -159,6 +156,25 @@ export class DashboardService {
       initialBirds > 0
         ? Number(((totalDead / initialBirds) * 100).toFixed(2))
         : 0;
+
+    const eggDaySums = this.sumRowsByDay(
+      eggTrendRows.map((row) => ({
+        day: row.logDate,
+        value: row.eggsCollected,
+      })),
+    );
+    const feedDaySums = this.sumRowsByDay(
+      feedTrendRows.map((row) => ({
+        day: row.logDate,
+        value: row.amountConsumed,
+      })),
+    );
+    const mortalityDaySums = this.sumRowsByDay(
+      mortalityTrendRows.map((row) => ({
+        day: row.logDate,
+        value: row.count,
+      })),
+    );
 
     const eggSeries = this.buildDailySeriesFromSums(eggDaySums, sevenDaysAgo);
     const feedSeries = this.buildDailySeriesFromSums(feedDaySums, sevenDaysAgo);
@@ -259,6 +275,20 @@ export class DashboardService {
       expenses: Number(expenses._sum.amount || 0),
       eggs: eggs._sum.eggsCollected || 0,
     };
+  }
+
+  private sumRowsByDay(
+    rows: Array<{ day: Date; value: unknown }>,
+  ): DaySumRow[] {
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      const key = this.toDateKey(row.day);
+      map.set(key, (map.get(key) || 0) + this.toNumber(row.value));
+    }
+    return Array.from(map.entries()).map(([day, value]) => ({
+      day: new Date(`${day}T00:00:00.000Z`),
+      value,
+    }));
   }
 
   private buildDailySeriesFromSums(records: DaySumRow[], startDate: Date) {
