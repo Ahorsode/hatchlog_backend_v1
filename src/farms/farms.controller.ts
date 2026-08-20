@@ -28,6 +28,7 @@ export class FarmsController {
   }
 
   @Get(':id')
+  @AllowWhenFarmLocked()
   @ApiOkResponse({ description: 'Get farm by id' })
   getById(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.farmsService.getById(user, id);
