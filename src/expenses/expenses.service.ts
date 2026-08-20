@@ -110,7 +110,12 @@ export class ExpensesService {
           );
         }
         const activeBatches = await tx.livestock.findMany({
-          where: { farmId, id: { in: uniqueIds }, status: 'active', isDeleted: false },
+          where: {
+            farmId,
+            id: { in: uniqueIds },
+            status: 'active',
+            isDeleted: false,
+          },
           select: { id: true },
         });
         if (activeBatches.length !== uniqueIds.length) {
@@ -149,7 +154,10 @@ export class ExpensesService {
         }
       }
 
-      return { success: true, expense: { ...expense, amount: Number(expense.amount) } };
+      return {
+        success: true,
+        expense: { ...expense, amount: Number(expense.amount) },
+      };
     });
   }
 

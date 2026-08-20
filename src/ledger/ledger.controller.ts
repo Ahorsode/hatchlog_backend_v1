@@ -28,9 +28,11 @@ export class LedgerController {
 
   @Get()
   @RequireFarmPermission('finance', 'view')
-  @ApiOkResponse({ description: 'List financial transactions + expenses merged' })
+  @ApiOkResponse({
+    description: 'List financial transactions + expenses merged',
+  })
   list(@CurrentUser() user: AuthUser, @Query() query: FarmScopedQueryDto) {
-    return this.service.list(user, query.farm_id);
+    return this.service.list(user, query);
   }
 
   @Post()

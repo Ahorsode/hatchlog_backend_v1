@@ -21,10 +21,7 @@ export class IsolationController {
   @Get('isolation-rooms')
   @RequireFarmPermission('mortality', 'view')
   @ApiOkResponse({ description: 'List isolation rooms for a farm' })
-  listRooms(
-    @CurrentUser() user: AuthUser,
-    @Query() query: FarmScopedQueryDto,
-  ) {
+  listRooms(@CurrentUser() user: AuthUser, @Query() query: FarmScopedQueryDto) {
     return this.isolationService.listRooms(user, query);
   }
 
@@ -41,10 +38,7 @@ export class IsolationController {
   @Post('isolation/transfer')
   @RequireFarmPermission('batches', 'edit')
   @ApiOkResponse({ description: 'Transfer birds to isolation' })
-  transfer(
-    @CurrentUser() user: AuthUser,
-    @Body() body: IsolationTransferDto,
-  ) {
+  transfer(@CurrentUser() user: AuthUser, @Body() body: IsolationTransferDto) {
     return this.isolationService.transfer(user, body);
   }
 

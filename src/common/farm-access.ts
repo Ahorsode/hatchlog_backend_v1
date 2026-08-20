@@ -10,7 +10,9 @@ export function assertFarmAccess(user: AuthUser, farmId: string): void {
   }
 }
 
-export function parseOptionalDate(value?: string | Date | null): Date | undefined {
+export function parseOptionalDate(
+  value?: string | Date | null,
+): Date | undefined {
   if (value == null || value === '') return undefined;
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -25,4 +27,15 @@ export function requireDate(value: string | Date, field = 'date'): Date {
     throw new BadRequestException(`${field} is required`);
   }
   return date;
+}
+
+export function readFarmIdParam(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'bigint') {
+    return String(value).trim();
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    return readFarmIdParam(value[0]);
+  }
+  return '';
 }

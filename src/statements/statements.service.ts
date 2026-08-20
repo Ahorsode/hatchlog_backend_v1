@@ -21,6 +21,7 @@ export class StatementsService {
           where: { isDeleted: false },
           include: { items: true },
           orderBy: { orderDate: 'desc' },
+          take: 200,
         },
       },
     });
@@ -60,9 +61,11 @@ export class StatementsService {
         inventory: {
           where: { isDeleted: false },
           orderBy: { createdAt: 'desc' },
+          take: 200,
         },
         expenses: {
           orderBy: { expenseDate: 'desc' },
+          take: 200,
         },
       },
     });

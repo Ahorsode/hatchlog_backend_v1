@@ -33,7 +33,9 @@ export class ExpensesController {
 
   @Get('allocation-batches')
   @RequireFarmPermission('finance', 'edit')
-  @ApiOkResponse({ description: 'Get active batches available for expense allocation' })
+  @ApiOkResponse({
+    description: 'Get active batches available for expense allocation',
+  })
   allocationBatches(
     @CurrentUser() user: AuthUser,
     @Query() query: FarmScopedQueryDto,

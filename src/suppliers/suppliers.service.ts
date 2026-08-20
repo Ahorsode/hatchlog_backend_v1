@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { AuthUser } from '../auth/auth.types';
 import { assertFarmAccess } from '../common/farm-access';
 import type {
@@ -43,18 +44,25 @@ export class SuppliersService {
   async getStats(user: AuthUser, id: string, farmId: string) {
     assertFarmAccess(user, farmId);
 
-    const supplier = await this.prisma.supplier.findFirst({
-      where: { id, farmId },
-      include: { inventory: true },
-    });
+    const [supplier, inventoryAgg, spentRows] = await Promise.all([
+      this.prisma.supplier.findFirst({
+        where: { id, farmId },
+      }),
+      this.prisma.inventory.aggregate({
+        where: { supplierId: id, farmId, isDeleted: false },
+        _count: { _all: true },
+      }),
+      this.prisma.$queryRaw<Array<{ total: Prisma.Decimal | number | null }>>(
+        Prisma.sql`
+          SELECT COALESCE(SUM("stockLevel" * COALESCE("costPerUnit", 0)), 0) AS total
+          FROM inventory
+          WHERE "supplierId" = ${id}
+            AND "farmId" = ${farmId}
+            AND "is_deleted" = false
+        `,
+      ),
+    ]);
     if (!supplier) throw new NotFoundException('Supplier not found');
-
-    const orderCount = supplier.inventory.length;
-    const totalSpent = supplier.inventory.reduce(
-      (sum, item) =>
-        sum + Number(item.stockLevel) * Number(item.costPerUnit || 0),
-      0,
-    );
 
     return {
       id: supplier.id,
@@ -64,8 +72,8 @@ export class SuppliersService {
       address: supplier.address,
       createdAt: supplier.createdAt,
       balanceOwed: Number(supplier.balanceOwed),
-      orderCount,
-      totalSpent,
+      orderCount: inventoryAgg._count._all,
+      totalSpent: Number(spentRows[0]?.total || 0),
     };
   }
 

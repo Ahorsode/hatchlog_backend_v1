@@ -14,12 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const MONEY_EPSILON = 0.01;
 
-const EGG_CATEGORIES = new Set([
-  'EGG',
-  'EGGS',
-  'EGG_STOCK',
-  'EGG_INVENTORY',
-]);
+const EGG_CATEGORIES = new Set(['EGG', 'EGGS', 'EGG_STOCK', 'EGG_INVENTORY']);
 
 function toMoney(value: number) {
   return Math.round(value * 100) / 100;
@@ -152,9 +147,7 @@ export class OrdersService {
           livestockId: item.livestockId || undefined,
           eggAllocationMode: item.eggAllocationMode || null,
           eggBatchId:
-            item.eggAllocationMode === 'batch'
-              ? (item.eggBatchId || null)
-              : null,
+            item.eggAllocationMode === 'batch' ? item.eggBatchId || null : null,
         });
       }
 
@@ -175,9 +168,7 @@ export class OrdersService {
       );
 
       if (cashReceived < 0) {
-        throw new BadRequestException(
-          'Total cash received cannot be negative',
-        );
+        throw new BadRequestException('Total cash received cannot be negative');
       }
 
       const paymentMethod = dto.paymentMethod || 'CASH';
@@ -232,7 +223,7 @@ export class OrdersService {
           items: { include: { inventory: true } },
           customer: true,
         },
-      } as any);
+      });
 
       const shouldComplete = dto.completeNow === true || isPaid;
       if (shouldComplete) {
@@ -285,11 +276,7 @@ export class OrdersService {
     return mapOrder(result);
   }
 
-  async updateStatus(
-    user: AuthUser,
-    id: string,
-    dto: UpdateOrderStatusDto,
-  ) {
+  async updateStatus(user: AuthUser, id: string, dto: UpdateOrderStatusDto) {
     assertFarmAccess(user, dto.farm_id);
 
     const order = await this.prisma.order.findFirst({
@@ -328,12 +315,7 @@ export class OrdersService {
     return mapOrder(result);
   }
 
-  async remove(
-    user: AuthUser,
-    id: string,
-    farmId: string,
-    reason?: string,
-  ) {
+  async remove(user: AuthUser, id: string, farmId: string, reason?: string) {
     assertFarmAccess(user, farmId);
 
     if (!reason || reason.trim().length < 5) {
@@ -394,9 +376,7 @@ export class OrdersService {
           data: { stockLevel: { decrement: item.quantity } },
         });
 
-        const category = String(
-          item.inventory?.category || '',
-        ).toUpperCase();
+        const category = String(item.inventory?.category || '').toUpperCase();
         if (EGG_CATEGORIES.has(category)) {
           await this.deductEggFifo(tx, farmId, item);
         }
@@ -474,9 +454,7 @@ export class OrdersService {
           data: { stockLevel: { increment: item.quantity } },
         });
 
-        const category = String(
-          item.inventory?.category || '',
-        ).toUpperCase();
+        const category = String(item.inventory?.category || '').toUpperCase();
         if (EGG_CATEGORIES.has(category)) {
           let qtyToRestore = item.quantity;
           const productions = await tx.eggProduction.findMany({

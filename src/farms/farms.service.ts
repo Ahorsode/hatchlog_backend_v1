@@ -29,7 +29,11 @@ export class FarmsService {
 
     if (!name) throw new BadRequestException('Farm name is required');
     if (!location) throw new BadRequestException('Location is required');
-    if (!Number.isFinite(capacity) || capacity < 0 || !Number.isInteger(capacity)) {
+    if (
+      !Number.isFinite(capacity) ||
+      capacity < 0 ||
+      !Number.isInteger(capacity)
+    ) {
       throw new BadRequestException('Capacity must be a non-negative integer');
     }
 

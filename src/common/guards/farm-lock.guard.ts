@@ -12,6 +12,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ALLOW_WHEN_FARM_LOCKED_KEY } from '../decorators/allow-when-farm-locked.decorator';
 import { FARM_ENTITLEMENT_KEY } from '../decorators/require-entitlement.decorator';
 import type { AuthUser } from '../../auth/auth.types';
+import { readFarmIdParam } from '../farm-access';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   hasEntitlement,
@@ -41,9 +42,9 @@ export class FarmLockGuard implements CanActivate {
       FarmEntitlement | undefined
     >(FARM_ENTITLEMENT_KEY, [context.getHandler(), context.getClass()]);
 
-    const request = context.switchToHttp().getRequest<
-      Request & { user?: AuthUser }
-    >();
+    const request = context
+      .switchToHttp()
+      .getRequest<Request & { user?: AuthUser }>();
     const farmId = this.extractFarmId(request);
     if (!farmId) return true;
 
@@ -87,14 +88,17 @@ export class FarmLockGuard implements CanActivate {
   }
 
   private extractFarmId(request: Request): string {
-    const fromQuery = request.query?.farm_id;
+    const fromQuery = readFarmIdParam(request.query?.farm_id);
+    if (fromQuery) return fromQuery;
+
     const fromBody =
       request.body && typeof request.body === 'object'
-        ? (request.body as Record<string, unknown>).farm_id ??
-          (request.body as Record<string, unknown>).farmId
-        : undefined;
-    const raw = String(fromQuery ?? fromBody ?? '').trim();
-    if (raw) return raw;
+        ? readFarmIdParam(
+            (request.body as Record<string, unknown>).farm_id ??
+              (request.body as Record<string, unknown>).farmId,
+          )
+        : '';
+    if (fromBody) return fromBody;
 
     const path = request.path || request.url || '';
     const farmPath = path.match(/\/api\/v1\/farms\/([^/?]+)/);

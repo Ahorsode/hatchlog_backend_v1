@@ -26,7 +26,9 @@ export class MeService {
   ) {}
 
   async getMe(user: AuthUser) {
-    const cached = this.authCache.getMeProfile<Record<string, unknown>>(user.id);
+    const cached = this.authCache.getMeProfile<Record<string, unknown>>(
+      user.id,
+    );
     if (cached) return cached;
 
     const dbUser = await this.prisma.user.findUnique({
@@ -362,9 +364,7 @@ export class MeService {
     return farms.map((farm) => ({
       ...farm,
       membershipRole:
-        farm.userId === user.id
-          ? 'OWNER'
-          : (roleByFarm.get(farm.id) ?? null),
+        farm.userId === user.id ? 'OWNER' : (roleByFarm.get(farm.id) ?? null),
     }));
   }
 }

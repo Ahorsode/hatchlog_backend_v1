@@ -47,7 +47,9 @@ export class CustomersController {
 
   @Get(':id/stats')
   @RequireFarmPermission('customers', 'view')
-  @ApiOkResponse({ description: 'Get customer stats (order count, total spent)' })
+  @ApiOkResponse({
+    description: 'Get customer stats (order count, total spent)',
+  })
   getStats(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,

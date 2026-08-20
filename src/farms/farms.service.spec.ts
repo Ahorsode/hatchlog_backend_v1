@@ -12,10 +12,11 @@ describe('FarmsService.onboard', () => {
   };
 
   it('starts a 30-day STANDARD trial when creating a farm', async () => {
+    const farmCreate = jest.fn().mockResolvedValue({ id: 'farm_1' });
     const prisma = {
       farm: {
         findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockResolvedValue({ id: 'farm_1' }),
+        create: farmCreate,
       },
       farmMember: { create: jest.fn() },
       farmSettings: { create: jest.fn() },
@@ -29,12 +30,19 @@ describe('FarmsService.onboard', () => {
       capacity: 500,
     });
 
-    const data = prisma.farm.create.mock.calls[0][0].data as {
-      subscriptionTier: string;
-      masterLicenseStatus: string;
-      trialStartedAt: Date;
-      trialExpiresAt: Date;
-    };
+    const createCalls = farmCreate.mock.calls as unknown as Array<
+      [
+        {
+          data: {
+            subscriptionTier: string;
+            masterLicenseStatus: string;
+            trialStartedAt: Date;
+            trialExpiresAt: Date;
+          };
+        },
+      ]
+    >;
+    const data = createCalls[0][0].data;
     expect(data.subscriptionTier).toBe('STANDARD');
     expect(data.masterLicenseStatus).toBe('CLOUD_TRIAL');
     expect(
@@ -44,13 +52,14 @@ describe('FarmsService.onboard', () => {
   });
 
   it('sets trial fields when onboarding a placeholder farm without a clock', async () => {
+    const farmUpdate = jest.fn().mockResolvedValue({ id: 'farm_1' });
     const prisma = {
       farm: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'farm_1',
           trialStartedAt: null,
         }),
-        update: jest.fn().mockResolvedValue({ id: 'farm_1' }),
+        update: farmUpdate,
       },
       farmMember: { upsert: jest.fn() },
       farmSettings: { upsert: jest.fn() },
@@ -64,10 +73,17 @@ describe('FarmsService.onboard', () => {
       capacity: 500,
     });
 
-    const data = prisma.farm.update.mock.calls[0][0].data as {
-      subscriptionTier: string;
-      masterLicenseStatus: string;
-    };
+    const updateCalls = farmUpdate.mock.calls as unknown as Array<
+      [
+        {
+          data: {
+            subscriptionTier: string;
+            masterLicenseStatus: string;
+          };
+        },
+      ]
+    >;
+    const data = updateCalls[0][0].data;
     expect(data.subscriptionTier).toBe('STANDARD');
     expect(data.masterLicenseStatus).toBe('CLOUD_TRIAL');
   });

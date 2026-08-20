@@ -31,7 +31,9 @@ export class HousesService {
       select: { role: true },
     });
     if (membership?.role !== 'MANAGER') {
-      throw new ForbiddenException('Only farm owner or manager can manage houses');
+      throw new ForbiddenException(
+        'Only farm owner or manager can manage houses',
+      );
     }
   }
 

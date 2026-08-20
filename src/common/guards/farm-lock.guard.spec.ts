@@ -13,7 +13,10 @@ import { FARM_ENTITLEMENT_KEY } from '../decorators/require-entitlement.decorato
 describe('FarmLockGuard', () => {
   const farmId = 'farm_1';
 
-  function contextFor(path: string, query: Record<string, string> = { farm_id: farmId }) {
+  function contextFor(
+    path: string,
+    query: Record<string, string> = { farm_id: farmId },
+  ) {
     return {
       getHandler: () => ({}),
       getClass: () => ({}),
@@ -36,7 +39,8 @@ describe('FarmLockGuard', () => {
     const reflector = {
       getAllAndOverride: jest.fn((key: string) => {
         if (key === IS_PUBLIC_KEY) return false;
-        if (key === ALLOW_WHEN_FARM_LOCKED_KEY) return opts.allowWhenLocked ?? false;
+        if (key === ALLOW_WHEN_FARM_LOCKED_KEY)
+          return opts.allowWhenLocked ?? false;
         if (key === FARM_ENTITLEMENT_KEY) return opts.entitlement;
         return undefined;
       }),
@@ -46,7 +50,10 @@ describe('FarmLockGuard', () => {
         findUnique: jest.fn().mockResolvedValue(opts.farm),
       },
     };
-    return new FarmLockGuard(reflector as unknown as Reflector, prisma as never);
+    return new FarmLockGuard(
+      reflector as unknown as Reflector,
+      prisma as never,
+    );
   }
 
   it('rejects livestock list on a locked unpaid farm', async () => {
@@ -59,7 +66,9 @@ describe('FarmLockGuard', () => {
       },
     });
 
-    await expect(guard.canActivate(contextFor('/api/v1/livestock'))).rejects.toEqual(
+    await expect(
+      guard.canActivate(contextFor('/api/v1/livestock')),
+    ).rejects.toEqual(
       expect.objectContaining({
         status: HttpStatus.PAYMENT_REQUIRED,
       }),
@@ -103,8 +112,8 @@ describe('FarmLockGuard', () => {
       },
     });
 
-    await expect(guard.canActivate(contextFor('/api/v1/customers'))).resolves.toBe(
-      true,
-    );
+    await expect(
+      guard.canActivate(contextFor('/api/v1/customers')),
+    ).resolves.toBe(true);
   });
 });

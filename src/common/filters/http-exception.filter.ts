@@ -23,7 +23,7 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
         typeof body === 'string'
           ? body
           : Array.isArray((body as { message?: unknown }).message)
-            ? ((body as { message: string[] }).message).join(', ')
+            ? (body as { message: string[] }).message.join(', ')
             : String(
                 (body as { message?: string }).message ??
                   exception.message ??

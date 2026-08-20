@@ -55,7 +55,8 @@ export class SubscriptionsService {
 
     const monthly = TIER_MONTHLY_PRICE[tier];
     const discount = TERM_DISCOUNTS[normalizedMonths] ?? 0;
-    const total = Math.round(monthly * normalizedMonths * (1 - discount) * 100) / 100;
+    const total =
+      Math.round(monthly * normalizedMonths * (1 - discount) * 100) / 100;
 
     const farm = await this.prisma.farm.findUnique({
       where: { id: farmId },

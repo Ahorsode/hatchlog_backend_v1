@@ -18,45 +18,62 @@ export class RemindersService {
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
 
-    const farms = await this.prisma.farm.findMany({
-      select: { id: true, name: true },
-    });
-
-    const results: FarmReminderResult[] = [];
-
-    for (const farm of farms) {
-      const settings = await this.prisma.farmSettings.findUnique({
-        where: { farmId: farm.id },
-      });
-
-      const [eggLogToday, feedLogToday, layerCount] = await Promise.all([
-        this.prisma.eggProduction.aggregate({
-          where: { farmId: farm.id, logDate: { gte: today }, isDeleted: false },
-          _sum: { eggsCollected: true },
+    const [farms, settingsRows, eggByFarm, feedByFarm, layersByFarm] =
+      await Promise.all([
+        this.prisma.farm.findMany({
+          select: { id: true, name: true },
         }),
-        this.prisma.feedingLog.count({
-          where: {
-            farmId: farm.id,
-            logDate: { gte: today },
-            isDeleted: false,
+        this.prisma.farmSettings.findMany({
+          select: {
+            farmId: true,
+            eggRecordReminderTime: true,
+            feedRecordReminderTime: true,
           },
         }),
-        this.prisma.livestock.count({
+        this.prisma.eggProduction.groupBy({
+          by: ['farmId'],
+          where: { logDate: { gte: today }, isDeleted: false },
+          _sum: { eggsCollected: true },
+        }),
+        this.prisma.feedingLog.groupBy({
+          by: ['farmId'],
+          where: { logDate: { gte: today }, isDeleted: false },
+          _count: { _all: true },
+        }),
+        this.prisma.livestock.groupBy({
+          by: ['farmId'],
           where: {
-            farmId: farm.id,
             status: 'active',
             type: 'POULTRY_LAYER',
             isDeleted: false,
           },
+          _count: { _all: true },
         }),
       ]);
 
+    const settingsByFarm = new Map(
+      settingsRows.map((row) => [row.farmId, row]),
+    );
+    const eggsByFarm = new Map(
+      eggByFarm.map((row) => [row.farmId, row._sum.eggsCollected || 0]),
+    );
+    const feedsByFarm = new Map(
+      feedByFarm.map((row) => [row.farmId, row._count._all]),
+    );
+    const layerCountByFarm = new Map(
+      layersByFarm.map((row) => [row.farmId, row._count._all]),
+    );
+
+    const results: FarmReminderResult[] = [];
+
+    for (const farm of farms) {
+      const settings = settingsByFarm.get(farm.id);
       const alerts = buildDailyReminderAlerts({
         eggRecordReminderTime: settings?.eggRecordReminderTime,
         feedRecordReminderTime: settings?.feedRecordReminderTime,
-        hasEggLogToday: (eggLogToday._sum.eggsCollected || 0) > 0,
-        hasFeedLogToday: feedLogToday > 0,
-        activeLayerBatchCount: layerCount,
+        hasEggLogToday: (eggsByFarm.get(farm.id) || 0) > 0,
+        hasFeedLogToday: (feedsByFarm.get(farm.id) || 0) > 0,
+        activeLayerBatchCount: layerCountByFarm.get(farm.id) || 0,
         now,
       });
 

@@ -49,7 +49,8 @@ export class EggCollectionHandler implements EntityHandler {
       new Date(),
     );
 
-    const categoryId = asString(payload.category_id || payload.categoryId) || null;
+    const categoryId =
+      asString(payload.category_id || payload.categoryId) || null;
     const unusableCount = Math.round(asNumber(payload.unusable_count));
     const eggsRemaining = Math.max(
       eggsCollected - unusableCount,

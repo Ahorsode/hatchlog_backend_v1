@@ -14,6 +14,7 @@ import {
 } from '../common/dto/domain.dto';
 import { assertFarmAccess } from '../common/farm-access';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthContextCache } from '../auth/auth-context.cache';
 
 const ALLOWED_ROLES = new Set<string>([
   'MANAGER',
@@ -25,7 +26,10 @@ const ALLOWED_ROLES = new Set<string>([
 
 @Injectable()
 export class TeamService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authCache: AuthContextCache,
+  ) {}
 
   private async assertOwnerOrManager(user: AuthUser, farmId: string) {
     const farm = await this.prisma.farm.findUnique({
@@ -113,9 +117,7 @@ export class TeamService {
     await this.assertOwnerOrManager(user, dto.farm_id);
 
     if (!dto.email && !dto.phoneNumber) {
-      throw new BadRequestException(
-        'Provide either email or phoneNumber',
-      );
+      throw new BadRequestException('Provide either email or phoneNumber');
     }
     if (!ALLOWED_ROLES.has(dto.role)) {
       throw new BadRequestException('Invalid role');
@@ -164,11 +166,7 @@ export class TeamService {
     return { success: true };
   }
 
-  async deleteMember(
-    user: AuthUser,
-    targetUserId: string,
-    farmId: string,
-  ) {
+  async deleteMember(user: AuthUser, targetUserId: string, farmId: string) {
     assertFarmAccess(user, farmId);
     await this.assertFarmOwner(user, farmId);
 
@@ -182,6 +180,7 @@ export class TeamService {
     if (!membership) throw new NotFoundException('Member not found');
 
     await this.prisma.farmMember.delete({ where: { id: membership.id } });
+    this.authCache.invalidateUser(targetUserId);
     return { success: true };
   }
 
@@ -207,12 +206,14 @@ export class TeamService {
     });
     if (!membership) throw new NotFoundException('Member not found');
 
-    return this.prisma.farmMember.update({
+    const updated = await this.prisma.farmMember.update({
       where: {
         farmId_userId: { farmId: dto.farm_id, userId: targetUserId },
       },
       data: { role: dto.role as Role },
     });
+    this.authCache.invalidateUser(targetUserId);
+    return updated;
   }
 
   async getPermissions(user: AuthUser, targetUserId: string, farmId: string) {
@@ -233,12 +234,10 @@ export class TeamService {
     await this.assertFarmOwner(user, farmId);
 
     if (targetUserId === user.id) {
-      throw new BadRequestException(
-        'Cannot modify your own permissions',
-      );
+      throw new BadRequestException('Cannot modify your own permissions');
     }
 
-    return this.prisma.userPermission.upsert({
+    const perms = await this.prisma.userPermission.upsert({
       where: { userId_farmId: { userId: targetUserId, farmId } },
       create: {
         userId: targetUserId,
@@ -247,5 +246,7 @@ export class TeamService {
       },
       update: { ...dto },
     });
+    this.authCache.invalidateUser(targetUserId);
+    return perms;
   }
 }

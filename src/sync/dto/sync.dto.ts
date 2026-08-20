@@ -73,7 +73,8 @@ export class SyncPullQueryDto {
   farm_id!: string;
 
   @ApiPropertyOptional({
-    description: 'ISO timestamp cursor; return records modified after this time',
+    description:
+      'ISO timestamp cursor; return records modified after this time',
   })
   @IsOptional()
   @IsISO8601()

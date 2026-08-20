@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import type { AuthUser } from '../auth/auth.types';
@@ -114,18 +110,11 @@ export class SyncService {
     }
   }
 
-  async pull(
-    user: AuthUser,
-    farmId: string,
-    since?: string,
-    limit = 200,
-  ) {
+  async pull(user: AuthUser, farmId: string, since?: string, limit = 200) {
     this.assertFarmAccess(user, farmId);
     const take = Math.min(Math.max(limit || 200, 1), 500);
     const sinceDate = since ? new Date(since) : null;
-    const sinceFilter = sinceDate
-      ? { gte: sinceDate }
-      : undefined;
+    const sinceFilter = sinceDate ? { gte: sinceDate } : undefined;
 
     const [eggs, feeds, mortalities] = await Promise.all([
       this.prisma.eggProduction.findMany({
@@ -177,7 +166,9 @@ export class SyncService {
 
     const sliced = records.slice(0, take);
     const nextCursor =
-      sliced.length > 0 ? sliced[sliced.length - 1].updated_at : since ?? null;
+      sliced.length > 0
+        ? sliced[sliced.length - 1].updated_at
+        : (since ?? null);
 
     return {
       sync_protocol_version: 1,

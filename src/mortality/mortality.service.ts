@@ -83,7 +83,8 @@ export class MortalityService {
           batchId: dto.batchId,
           farmId: dto.farm_id,
           count: dto.count,
-          type: dto.type === 'SICK' ? HealthEventType.SICK : HealthEventType.DEAD,
+          type:
+            dto.type === 'SICK' ? HealthEventType.SICK : HealthEventType.DEAD,
           isolationRoomId:
             dto.type === 'SICK' ? dto.isolationRoomId || null : null,
           reason: dto.reason,

@@ -163,9 +163,7 @@ export class FeedingService {
         ...(dto.logDate !== undefined
           ? { logDate: requireDate(dto.logDate, 'logDate') }
           : {}),
-        ...(dto.feedTypeId !== undefined
-          ? { feedTypeId: dto.feedTypeId }
-          : {}),
+        ...(dto.feedTypeId !== undefined ? { feedTypeId: dto.feedTypeId } : {}),
         ...(dto.formulationId !== undefined
           ? { formulationId: dto.formulationId }
           : {}),
@@ -228,10 +226,7 @@ export class FeedingService {
     if (!dto.ingredients.length) {
       throw new BadRequestException('Add at least one ingredient');
     }
-    if (
-      dto.targetLivestock &&
-      !LIVESTOCK_TYPES.has(dto.targetLivestock)
-    ) {
+    if (dto.targetLivestock && !LIVESTOCK_TYPES.has(dto.targetLivestock)) {
       throw new BadRequestException(
         `Invalid target livestock: ${dto.targetLivestock}`,
       );
@@ -248,9 +243,7 @@ export class FeedingService {
       );
     }
     if (
-      ingredients.some(
-        (i) => !Number.isFinite(i.quantity) || i.quantity <= 0,
-      )
+      ingredients.some((i) => !Number.isFinite(i.quantity) || i.quantity <= 0)
     ) {
       throw new BadRequestException(
         'Each ingredient must use at least one bag',
@@ -270,9 +263,7 @@ export class FeedingService {
           select: { id: true, stockLevel: true, itemName: true },
         });
         if (!item) {
-          throw new BadRequestException(
-            'Ingredient inventory item not found',
-          );
+          throw new BadRequestException('Ingredient inventory item not found');
         }
         if (Number(item.stockLevel) < ingredient.quantity) {
           throw new BadRequestException(

@@ -73,7 +73,9 @@ export class HealthDomainController {
 
   @Get('health-inventory')
   @RequireFarmPermission('health', 'view')
-  @ApiOkResponse({ description: 'Get health inventory (vaccines & medications)' })
+  @ApiOkResponse({
+    description: 'Get health inventory (vaccines & medications)',
+  })
   healthInventory(
     @CurrentUser() user: AuthUser,
     @Query() query: FarmScopedQueryDto,

@@ -49,6 +49,7 @@ export class TrashService {
           type: true,
         },
         orderBy: { updatedAt: 'desc' },
+        take: 100,
       }),
       this.prisma.feedingLog.findMany({
         where: { farmId, isDeleted: true },
@@ -60,6 +61,7 @@ export class TrashService {
           batch: { select: { batchName: true } },
         },
         orderBy: { logDate: 'desc' },
+        take: 100,
       }),
       this.prisma.eggProduction.findMany({
         where: { farmId, isDeleted: true },
@@ -72,6 +74,7 @@ export class TrashService {
           batch: { select: { batchName: true } },
         },
         orderBy: { logDate: 'desc' },
+        take: 100,
       }),
       this.prisma.healthMortality.findMany({
         where: { farmId, isDeleted: true },
@@ -85,6 +88,7 @@ export class TrashService {
           batch: { select: { batchName: true } },
         },
         orderBy: { logDate: 'desc' },
+        take: 100,
       }),
       this.prisma.expense.findMany({
         where: { farmId, isDeleted: true },
@@ -96,6 +100,7 @@ export class TrashService {
           expenseDate: true,
         },
         orderBy: { expenseDate: 'desc' },
+        take: 100,
       }),
       this.prisma.sale.findMany({
         where: { farmId, isDeleted: true },
@@ -110,6 +115,7 @@ export class TrashService {
           },
         },
         orderBy: { saleDate: 'desc' },
+        take: 100,
       }),
       this.prisma.order.findMany({
         where: { farmId, isDeleted: true },
@@ -124,6 +130,7 @@ export class TrashService {
           },
         },
         orderBy: { orderDate: 'desc' },
+        take: 100,
       }),
       this.prisma.inventory.findMany({
         where: { farmId, isDeleted: true },
@@ -135,6 +142,7 @@ export class TrashService {
           category: true,
         },
         orderBy: { updatedAt: 'desc' },
+        take: 100,
       }),
     ]);
 
@@ -170,12 +178,7 @@ export class TrashService {
     };
   }
 
-  async restore(
-    user: AuthUser,
-    table: string,
-    id: string,
-    farmId: string,
-  ) {
+  async restore(user: AuthUser, table: string, id: string, farmId: string) {
     assertFarmAccess(user, farmId);
 
     const modelName = RESTORABLE_MODELS[table];

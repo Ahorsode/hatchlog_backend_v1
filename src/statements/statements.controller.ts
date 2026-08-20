@@ -20,11 +20,7 @@ export class StatementsController {
     @Param('id') id: string,
     @Query() query: FarmScopedQueryDto,
   ) {
-    return this.statementsService.getCustomerStatement(
-      user,
-      id,
-      query.farm_id,
-    );
+    return this.statementsService.getCustomerStatement(user, id, query.farm_id);
   }
 
   @Get('supplier/:id')
@@ -35,10 +31,6 @@ export class StatementsController {
     @Param('id') id: string,
     @Query() query: FarmScopedQueryDto,
   ) {
-    return this.statementsService.getSupplierStatement(
-      user,
-      id,
-      query.farm_id,
-    );
+    return this.statementsService.getSupplierStatement(user, id, query.farm_id);
   }
 }

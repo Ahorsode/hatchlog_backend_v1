@@ -15,10 +15,7 @@ export class PaymentsController {
   @Post()
   @RequireFarmPermission('finance', 'edit')
   @ApiOkResponse({ description: 'Record a customer payment' })
-  recordPayment(
-    @CurrentUser() user: AuthUser,
-    @Body() body: RecordPaymentDto,
-  ) {
+  recordPayment(@CurrentUser() user: AuthUser, @Body() body: RecordPaymentDto) {
     return this.paymentsService.recordPayment(user, body);
   }
 }

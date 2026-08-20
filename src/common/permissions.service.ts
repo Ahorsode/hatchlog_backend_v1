@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthContextCache } from '../auth/auth-context.cache';
 import { assertFarmAccess } from './farm-access';
 import type {
   PermissionAction,
@@ -27,10 +28,22 @@ const PERMISSION_MAP = {
 
 @Injectable()
 export class PermissionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authCache: AuthContextCache,
+  ) {}
 
   async resolveFarmContext(user: AuthUser, farmId: string) {
     assertFarmAccess(user, farmId);
+
+    const cached = this.authCache.getFarmContext<{
+      farmId: string;
+      isFarmOwner: boolean;
+      role: string;
+      permissions: unknown;
+      membership: { role: string } | null;
+    }>(user.id, farmId);
+    if (cached) return cached;
 
     const farm = await this.prisma.farm.findUnique({
       where: { id: farmId },
@@ -51,7 +64,9 @@ export class PermissionsService {
       ? 'OWNER'
       : membership?.role || user.role || 'WORKER';
 
-    return { farmId, isFarmOwner, role, permissions, membership };
+    const ctx = { farmId, isFarmOwner, role, permissions, membership };
+    this.authCache.setFarmContext(user.id, farmId, ctx);
+    return ctx;
   }
 
   async hasPermission(

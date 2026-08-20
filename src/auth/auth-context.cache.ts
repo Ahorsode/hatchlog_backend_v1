@@ -45,7 +45,10 @@ export class AuthContextCache {
     }
   }
 
-  private read<T>(store: Map<string, CacheEntry<T>>, key: string): T | undefined {
+  private read<T>(
+    store: Map<string, CacheEntry<T>>,
+    key: string,
+  ): T | undefined {
     const entry = store.get(key);
     if (!entry) return undefined;
     if (Date.now() > entry.expiresAt) {

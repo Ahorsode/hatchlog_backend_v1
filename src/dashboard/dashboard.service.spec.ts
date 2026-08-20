@@ -41,7 +41,14 @@ describe('DashboardService.getMonthlySummary', () => {
     });
     expect(prisma.sale.aggregate).toHaveBeenCalled();
     expect(prisma.expense.aggregate).toHaveBeenCalled();
-    expect(prisma.eggProduction.aggregate).toHaveBeenCalled();
+    expect(prisma.eggProduction.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          farmId,
+          isDeleted: false,
+        }),
+      }),
+    );
   });
 
   it('defaults missing aggregates to zero', async () => {

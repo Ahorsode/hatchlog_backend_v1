@@ -130,9 +130,7 @@ export class SupabaseAuthGuard implements CanActivate {
     }
   }
 
-  private async tryApiKeyAuth(
-    request: Request,
-  ): Promise<AuthUser | null> {
+  private async tryApiKeyAuth(request: Request): Promise<AuthUser | null> {
     const configuredKey = this.config.get('HATCHLOG_INTERNAL_API_KEY', {
       infer: true,
     });

@@ -37,15 +37,22 @@ describe('AdminService.upgradeTier', () => {
     });
 
     expect(deviceUpdateMany).not.toHaveBeenCalled();
-    expect(farmUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'farm_1' },
-        data: expect.objectContaining({
-          subscriptionTier: 'PREMIUM',
-          masterLicenseStatus: 'PAID_PREMIUM',
-        }),
-      }),
-    );
+    expect(farmUpdate).toHaveBeenCalled();
+    const updateCalls = farmUpdate.mock.calls as unknown as Array<
+      [
+        {
+          where: { id: string };
+          data: {
+            subscriptionTier: string;
+            masterLicenseStatus: string;
+          };
+        },
+      ]
+    >;
+    const updateArg = updateCalls[0][0];
+    expect(updateArg.where).toEqual({ id: 'farm_1' });
+    expect(updateArg.data.subscriptionTier).toBe('PREMIUM');
+    expect(updateArg.data.masterLicenseStatus).toBe('PAID_PREMIUM');
     expect(eventCreate).toHaveBeenCalled();
   });
 });

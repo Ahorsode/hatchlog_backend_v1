@@ -20,7 +20,10 @@ export type ApiEnvelope<T = unknown> = {
  */
 @Injectable()
 export class ResponseEnvelopeInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
+  intercept(
+    _context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<unknown> {
     return next.handle().pipe(
       map((data) => {
         if (data instanceof StreamableFile || Buffer.isBuffer(data)) {

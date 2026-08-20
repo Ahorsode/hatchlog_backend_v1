@@ -38,30 +38,28 @@ type FarmAccessInput = {
   trialExpiresAt?: Date | null;
 };
 
-const TIER_ENTITLEMENTS: Record<
-  FarmAccessSnapshot['tier'],
-  FarmEntitlement[]
-> = {
-  BASIC: ['PDF_INVOICES'],
-  STANDARD: [
-    'PDF_INVOICES',
-    'WORKER_LIMIT',
-    'multi-livestock',
-    'advanced-finance',
-  ],
-  PREMIUM: [
-    'PDF_INVOICES',
-    'CRM',
-    'ADVANCED_ACCOUNTING',
-    'ANALYTICS_BENCHMARKING',
-    'MULTI_CURRENCY',
-    'WORKER_LIMIT',
-    'multi-livestock',
-    'advanced-finance',
-    'marketing',
-    'feed-formulation',
-  ],
-};
+const TIER_ENTITLEMENTS: Record<FarmAccessSnapshot['tier'], FarmEntitlement[]> =
+  {
+    BASIC: ['PDF_INVOICES'],
+    STANDARD: [
+      'PDF_INVOICES',
+      'WORKER_LIMIT',
+      'multi-livestock',
+      'advanced-finance',
+    ],
+    PREMIUM: [
+      'PDF_INVOICES',
+      'CRM',
+      'ADVANCED_ACCOUNTING',
+      'ANALYTICS_BENCHMARKING',
+      'MULTI_CURRENCY',
+      'WORKER_LIMIT',
+      'multi-livestock',
+      'advanced-finance',
+      'marketing',
+      'feed-formulation',
+    ],
+  };
 
 export function isPaidMasterStatus(status: string | null | undefined) {
   return PAID_MASTER_STATUSES.includes(

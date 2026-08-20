@@ -8,6 +8,7 @@ import { assertFarmAccess, requireDate } from '../common/farm-access';
 import type {
   CreateLedgerTransactionDto,
   DeleteLedgerTransactionDto,
+  FarmScopedQueryDto,
   SettleLedgerTransactionDto,
 } from '../common/dto/domain.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,8 +29,10 @@ const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
 export class LedgerService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(user: AuthUser, farmId: string) {
-    assertFarmAccess(user, farmId);
+  async list(user: AuthUser, query: FarmScopedQueryDto) {
+    assertFarmAccess(user, query.farm_id);
+    const farmId = query.farm_id;
+    const take = Math.min(Math.max(query.limit ?? 100, 1), 500);
 
     const [transactions, expenses] = await Promise.all([
       this.prisma.financialTransaction.findMany({
@@ -38,6 +41,7 @@ export class LedgerService {
           user: { select: { firstname: true, surname: true, role: true } },
         },
         orderBy: { transactionDate: 'desc' },
+        take,
       }),
       this.prisma.expense.findMany({
         where: { farmId, isDeleted: false },
@@ -45,6 +49,7 @@ export class LedgerService {
           user: { select: { firstname: true, surname: true, role: true } },
         },
         orderBy: { expenseDate: 'desc' },
+        take,
       }),
     ]);
 
@@ -71,11 +76,13 @@ export class LedgerService {
       source: 'EXPENSE' as const,
     }));
 
-    return [...ledgerRows, ...expenseRows].sort(
-      (a, b) =>
-        new Date(b.transactionDate).getTime() -
-        new Date(a.transactionDate).getTime(),
-    );
+    return [...ledgerRows, ...expenseRows]
+      .sort(
+        (a, b) =>
+          new Date(b.transactionDate).getTime() -
+          new Date(a.transactionDate).getTime(),
+      )
+      .slice(0, take);
   }
 
   async create(user: AuthUser, dto: CreateLedgerTransactionDto) {
@@ -131,11 +138,7 @@ export class LedgerService {
     });
   }
 
-  async settle(
-    user: AuthUser,
-    id: string,
-    dto: SettleLedgerTransactionDto,
-  ) {
+  async settle(user: AuthUser, id: string, dto: SettleLedgerTransactionDto) {
     assertFarmAccess(user, dto.farm_id);
     const farmId = dto.farm_id;
 
@@ -179,11 +182,7 @@ export class LedgerService {
     });
   }
 
-  async remove(
-    user: AuthUser,
-    id: string,
-    dto: DeleteLedgerTransactionDto,
-  ) {
+  async remove(user: AuthUser, id: string, dto: DeleteLedgerTransactionDto) {
     assertFarmAccess(user, dto.farm_id);
     const farmId = dto.farm_id;
 

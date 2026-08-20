@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
 import { assertFarmAccess } from '../common/farm-access';
 import type {

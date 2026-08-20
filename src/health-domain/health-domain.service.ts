@@ -38,9 +38,7 @@ export class HealthDomainService {
   async listSchedules(user: AuthUser, query: HealthScheduleQueryDto) {
     assertFarmAccess(user, query.farm_id);
 
-    const batchFilter = query.batch_id
-      ? { batchId: query.batch_id }
-      : {};
+    const batchFilter = query.batch_id ? { batchId: query.batch_id } : {};
 
     const [vaccinations, medications] = await Promise.all([
       this.prisma.vaccinationSchedule.findMany({
@@ -256,11 +254,7 @@ export class HealthDomainService {
         unit: item.unit,
         usageType: item.usageType ?? null,
       };
-      if (
-        VACCINE_CATEGORIES.includes(
-          String(item.category).toUpperCase(),
-        )
-      ) {
+      if (VACCINE_CATEGORIES.includes(String(item.category).toUpperCase())) {
         vaccine.push(option);
       } else {
         medicine.push(option);
@@ -280,7 +274,8 @@ export class HealthDomainService {
     if (!name) throw new BadRequestException('Enter a name for the item');
 
     const usageType = normalizeUsageType(dto.usageType);
-    const unit = dto.unit?.trim() || (usageType === 'ONE_TIME' ? 'dose' : 'unit');
+    const unit =
+      dto.unit?.trim() || (usageType === 'ONE_TIME' ? 'dose' : 'unit');
     let stockLevel: number;
     if (usageType === 'ONE_TIME') {
       stockLevel = 1;
@@ -416,9 +411,7 @@ export class HealthDomainService {
     } else {
       quantity = Number(entry.quantity);
       if (!Number.isFinite(quantity) || quantity <= 0) {
-        throw new BadRequestException(
-          `Enter a valid quantity for "${name}"`,
-        );
+        throw new BadRequestException(`Enter a valid quantity for "${name}"`);
       }
     }
 
@@ -465,9 +458,7 @@ export class HealthDomainService {
     const usageType = normalizeUsageType(params.usageType ?? item.usageType);
     const stock = Number(item.stockLevel) || 0;
     if (stock <= 0) {
-      throw new BadRequestException(
-        `"${params.name}" is no longer in stock.`,
-      );
+      throw new BadRequestException(`"${params.name}" is no longer in stock.`);
     }
 
     if (usageType === 'ONE_TIME') {

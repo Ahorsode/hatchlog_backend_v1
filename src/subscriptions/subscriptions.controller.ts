@@ -4,7 +4,10 @@ import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AllowWhenFarmLocked } from '../common/decorators/allow-when-farm-locked.decorator';
 import { RequireFarmPermission } from '../common/decorators/require-farm-permission.decorator';
-import { FarmScopedQueryDto, RequestUpgradeDto } from '../common/dto/domain.dto';
+import {
+  FarmScopedQueryDto,
+  RequestUpgradeDto,
+} from '../common/dto/domain.dto';
 import { SubscriptionsService } from './subscriptions.service';
 
 @ApiTags('subscriptions')
@@ -16,10 +19,7 @@ export class SubscriptionsController {
   @Get('status')
   @AllowWhenFarmLocked()
   @ApiOkResponse({ description: 'Farm-scoped subscription and trial status' })
-  getStatus(
-    @CurrentUser() user: AuthUser,
-    @Query() query: FarmScopedQueryDto,
-  ) {
+  getStatus(@CurrentUser() user: AuthUser, @Query() query: FarmScopedQueryDto) {
     return this.service.getStatus(user, query.farm_id);
   }
 

@@ -25,6 +25,13 @@ export class FarmScopedQueryDto {
   @IsInt()
   @Min(1)
   limit?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  skip?: number;
 }
 
 export class CreateHouseDto {

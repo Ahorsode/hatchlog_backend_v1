@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { AuthUser } from '../auth/auth.types';
 import { assertFarmAccess } from '../common/farm-access';
 import type {
@@ -122,7 +123,7 @@ export class InventoryService {
 
       const totalCost = payload.stockLevel * (payload.costPerUnit || 0);
       const amountToLog =
-        dto.paymentPlan === 'full' ? totalCost : (dto.amountPaid || 0);
+        dto.paymentPlan === 'full' ? totalCost : dto.amountPaid || 0;
 
       if (amountToLog > 0) {
         const expenseCategory =
@@ -177,12 +178,16 @@ export class InventoryService {
     const item = await this.prisma.inventory.update({
       where: { id },
       data: {
-        ...(payload.itemName !== undefined ? { itemName: payload.itemName } : {}),
+        ...(payload.itemName !== undefined
+          ? { itemName: payload.itemName }
+          : {}),
         ...(payload.stockLevel !== undefined
           ? { stockLevel: payload.stockLevel }
           : {}),
         ...(payload.unit !== undefined ? { unit: payload.unit } : {}),
-        ...(payload.category !== undefined ? { category: payload.category } : {}),
+        ...(payload.category !== undefined
+          ? { category: payload.category }
+          : {}),
         ...(payload.costPerUnit !== undefined
           ? { costPerUnit: payload.costPerUnit }
           : {}),
@@ -198,12 +203,7 @@ export class InventoryService {
     return { ...item, stockLevel: Number(item.stockLevel) };
   }
 
-  async remove(
-    user: AuthUser,
-    id: string,
-    farmId: string,
-    reason?: string,
-  ) {
+  async remove(user: AuthUser, id: string, farmId: string, reason?: string) {
     assertFarmAccess(user, farmId);
 
     if (!reason || reason.trim().length < 5) {
@@ -243,7 +243,8 @@ export class InventoryService {
     const existing = await this.prisma.inventory.findFirst({
       where: { id, farmId, isDeleted: true },
     });
-    if (!existing) throw new NotFoundException('Deleted inventory item not found');
+    if (!existing)
+      throw new NotFoundException('Deleted inventory item not found');
 
     await this.prisma.inventory.update({
       where: { id },
@@ -282,73 +283,64 @@ export class InventoryService {
     return items.map(mapInventoryRow);
   }
 
-  private async getActiveBatchEggStock(farmId: string) {
-    const logs = await this.prisma.eggProduction.findMany({
-      where: {
-        farmId,
+  private remainingEggWhere(farmId: string): Prisma.EggProductionWhereInput {
+    return {
+      farmId,
+      isDeleted: false,
+      eggsRemaining: { gt: 0 },
+      batch: {
+        status: { equals: 'active', mode: 'insensitive' },
+        type: 'POULTRY_LAYER',
         isDeleted: false,
-        eggsRemaining: { gt: 0 },
-        batch: {
-          status: { equals: 'active', mode: 'insensitive' },
-          type: 'POULTRY_LAYER',
-          isDeleted: false,
-        },
       },
-      select: {
-        eggsRemaining: true,
-        batch: { select: { id: true, batchName: true } },
-      },
+    };
+  }
+
+  private async getActiveBatchEggStock(farmId: string) {
+    const grouped = await this.prisma.eggProduction.groupBy({
+      by: ['batchId'],
+      where: this.remainingEggWhere(farmId),
+      _sum: { eggsRemaining: true },
     });
 
-    const byBatch = new Map<
-      string,
-      { batchId: string; batchName: string; eggsRemaining: number }
-    >();
-    for (const log of logs) {
-      const batchId = log.batch?.id;
-      if (!batchId) continue;
-      const remaining = Number(log.eggsRemaining || 0);
-      const entry = byBatch.get(batchId);
-      if (entry) {
-        entry.eggsRemaining += remaining;
-      } else {
-        byBatch.set(batchId, {
-          batchId,
-          batchName: log.batch?.batchName || 'Batch',
-          eggsRemaining: remaining,
-        });
-      }
-    }
-
-    const batches = Array.from(byBatch.values()).sort((a, b) =>
-      a.batchName.localeCompare(b.batchName),
+    const batchIds = grouped.map((row) => row.batchId).filter(Boolean);
+    const batchesMeta =
+      batchIds.length === 0
+        ? []
+        : await this.prisma.livestock.findMany({
+            where: { id: { in: batchIds }, farmId },
+            select: { id: true, batchName: true },
+          });
+    const nameById = new Map(
+      batchesMeta.map((batch) => [batch.id, batch.batchName || 'Batch']),
     );
+
+    const batches = grouped
+      .map((row) => ({
+        batchId: row.batchId,
+        batchName: nameById.get(row.batchId) || 'Batch',
+        eggsRemaining: Number(row._sum?.eggsRemaining || 0),
+      }))
+      .sort((a, b) => a.batchName.localeCompare(b.batchName));
+
     const totalEggs = batches.reduce((sum, row) => sum + row.eggsRemaining, 0);
     return { totalEggs, batches };
   }
 
   private async getEggFifoAvailabilityMap(farmId: string) {
-    const logs = await this.prisma.eggProduction.findMany({
-      where: {
-        farmId,
-        isDeleted: false,
-        eggsRemaining: { gt: 0 },
-        batch: {
-          status: { equals: 'active', mode: 'insensitive' },
-          type: 'POULTRY_LAYER',
-          isDeleted: false,
-        },
-      },
-      select: { eggsRemaining: true, categoryId: true },
+    const grouped = await this.prisma.eggProduction.groupBy({
+      by: ['categoryId'],
+      where: this.remainingEggWhere(farmId),
+      _sum: { eggsRemaining: true },
     });
 
     const byCategoryId: Record<string, number> = {};
     let totalEggs = 0;
-    for (const log of logs) {
-      const remaining = Number(log.eggsRemaining || 0);
+    for (const row of grouped) {
+      const remaining = Number(row._sum?.eggsRemaining || 0);
       totalEggs += remaining;
-      const key = log.categoryId ? String(log.categoryId) : '__uncategorized__';
-      byCategoryId[key] = (byCategoryId[key] || 0) + remaining;
+      const key = row.categoryId ? String(row.categoryId) : '__uncategorized__';
+      byCategoryId[key] = remaining;
     }
 
     return { totalEggs, byCategoryId };

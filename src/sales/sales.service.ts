@@ -104,12 +104,7 @@ export class SalesService {
     };
   }
 
-  async remove(
-    user: AuthUser,
-    id: string,
-    farmId: string,
-    reason?: string,
-  ) {
+  async remove(user: AuthUser, id: string, farmId: string, reason?: string) {
     assertFarmAccess(user, farmId);
 
     if (!reason || reason.trim().length < 5) {

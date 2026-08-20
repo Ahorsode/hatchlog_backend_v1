@@ -258,11 +258,7 @@ export class LivestockService {
     return batch;
   }
 
-  async addWeight(
-    user: AuthUser,
-    batchId: string,
-    dto: CreateWeightRecordDto,
-  ) {
+  async addWeight(user: AuthUser, batchId: string, dto: CreateWeightRecordDto) {
     assertFarmAccess(user, dto.farm_id);
 
     const batch = await this.prisma.livestock.findFirst({

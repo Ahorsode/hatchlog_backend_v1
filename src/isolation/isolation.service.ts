@@ -48,8 +48,7 @@ export class IsolationService {
       });
       if (!batch) throw new BadRequestException('Batch not found');
 
-      const available =
-        (batch.currentCount || 0) - (batch.isolationCount || 0);
+      const available = (batch.currentCount || 0) - (batch.isolationCount || 0);
       if (available < dto.count) {
         throw new BadRequestException(
           'Not enough birds in main house to isolate',

@@ -36,9 +36,7 @@ export class FeedUsageHandler implements EntityHandler {
     const batchId = asString(payload.batch_id) || null;
     const feedTypeId = asString(payload.feed_type_id) || null;
     const formulationId = asString(payload.formulation_id) || null;
-    const amountConsumed = asNumber(
-      payload.amount_consumed ?? payload.bags,
-    );
+    const amountConsumed = asNumber(payload.amount_consumed ?? payload.bags);
     const logDate = parseDate(
       payload.log_date ?? mutation.client_updated_at,
       new Date(),
