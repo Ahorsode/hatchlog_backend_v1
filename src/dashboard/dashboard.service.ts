@@ -80,11 +80,11 @@ export class DashboardService {
         GROUP BY 1
       `),
       this.prisma.$queryRaw<DaySumRow[]>(Prisma.sql`
-        SELECT DATE_TRUNC('day', "logDate") AS day,
+        SELECT DATE_TRUNC('day', "log_date") AS day,
                COALESCE(SUM("amount_consumed"), 0) AS value
         FROM daily_feeding_logs
         WHERE "farmId" = ${farmId}
-          AND "logDate" >= ${sevenDaysAgo}
+          AND "log_date" >= ${sevenDaysAgo}
           AND "is_deleted" = false
         GROUP BY 1
       `),

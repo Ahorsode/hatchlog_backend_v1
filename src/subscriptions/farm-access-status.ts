@@ -1,6 +1,12 @@
 export const TRIAL_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+export const WORKER_LIMITS = {
+  BASIC: 2,
+  STANDARD: 5,
+  PREMIUM: 1000,
+} as const;
+
 export const PAID_MASTER_STATUSES = [
   'PAID_STANDARD',
   'PAID_PREMIUM',

@@ -15,6 +15,11 @@ import {
 import { assertFarmAccess } from '../common/farm-access';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthContextCache } from '../auth/auth-context.cache';
+import {
+  normalizeTier,
+  resolveFarmAccess,
+  WORKER_LIMITS,
+} from '../subscriptions/farm-access-status';
 
 const ALLOWED_ROLES = new Set<string>([
   'MANAGER',
@@ -69,7 +74,13 @@ export class TeamService {
 
     const farm = await this.prisma.farm.findUnique({
       where: { id: query.farm_id },
-      select: { userId: true },
+      select: {
+        userId: true,
+        subscriptionTier: true,
+        masterLicenseStatus: true,
+        trialStartedAt: true,
+        trialExpiresAt: true,
+      },
     });
 
     const members = await this.prisma.farmMember.findMany({
@@ -105,16 +116,72 @@ export class TeamService {
       where: { farmId: query.farm_id, status: 'PENDING' },
     });
 
+    const accessSnapshot = farm ? resolveFarmAccess(farm) : null;
+    const tier = accessSnapshot?.tier ?? normalizeTier(farm?.subscriptionTier);
+    const limit = WORKER_LIMITS[tier];
+    const nonOwnerMembers = members.filter((member) => member.role !== 'OWNER')
+      .length;
+    const currentSeats = nonOwnerMembers + invitations.length;
+
+    let currentUserRole = 'WORKER';
+    if (farm?.userId === user.id) {
+      currentUserRole = 'OWNER';
+    } else {
+      const selfMembership = members.find(
+        (member) => member.userId === user.id,
+      );
+      if (selfMembership?.role) {
+        currentUserRole = selfMembership.role;
+      }
+    }
+
     return {
       members: membersWithContext,
       invitations,
       isAbsoluteOwner: farm?.userId === user.id,
+      currentUserRole,
+      limitCheck: {
+        canAdd: currentSeats < limit,
+        limit,
+        current: currentSeats,
+      },
     };
+  }
+
+  private async assertWorkerSeatAvailable(farmId: string) {
+    const farm = await this.prisma.farm.findUnique({
+      where: { id: farmId },
+      select: {
+        subscriptionTier: true,
+        masterLicenseStatus: true,
+        trialStartedAt: true,
+        trialExpiresAt: true,
+      },
+    });
+    if (!farm) throw new NotFoundException('Farm not found');
+
+    const accessSnapshot = resolveFarmAccess(farm);
+    const limit = WORKER_LIMITS[accessSnapshot.tier];
+    const [nonOwnerMembers, pendingInvites] = await Promise.all([
+      this.prisma.farmMember.count({
+        where: { farmId, NOT: { role: 'OWNER' } },
+      }),
+      this.prisma.invitation.count({
+        where: { farmId, status: 'PENDING' },
+      }),
+    ]);
+    const current = nonOwnerMembers + pendingInvites;
+    if (current >= limit) {
+      throw new BadRequestException(
+        `Worker limit reached (${current}/${limit}). Upgrade your plan to invite more staff.`,
+      );
+    }
   }
 
   async createInvitation(user: AuthUser, dto: CreateInvitationDto) {
     assertFarmAccess(user, dto.farm_id);
     await this.assertOwnerOrManager(user, dto.farm_id);
+    await this.assertWorkerSeatAvailable(dto.farm_id);
 
     if (!dto.email && !dto.phoneNumber) {
       throw new BadRequestException('Provide either email or phoneNumber');
