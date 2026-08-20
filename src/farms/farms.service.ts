@@ -12,6 +12,7 @@ import {
 } from '../common/dto/domain.dto';
 import { assertFarmAccess } from '../common/farm-access';
 import { PrismaService } from '../prisma/prisma.service';
+import { trialCreateData } from '../subscriptions/farm-access-status';
 
 @Injectable()
 export class FarmsService {
@@ -40,7 +41,12 @@ export class FarmsService {
     if (owned) {
       const farm = await this.prisma.farm.update({
         where: { id: owned.id },
-        data: { name, location, capacity },
+        data: {
+          name,
+          location,
+          capacity,
+          ...(owned.trialStartedAt ? {} : trialCreateData()),
+        },
       });
 
       await this.prisma.farmMember.upsert({
@@ -71,6 +77,7 @@ export class FarmsService {
         location,
         capacity,
         userId: user.id,
+        ...trialCreateData(),
       },
     });
 

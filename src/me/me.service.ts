@@ -9,6 +9,8 @@ import * as bcrypt from 'bcryptjs';
 import type { AuthUser } from '../auth/auth.types';
 import type { Env } from '../config/env.schema';
 import { PrismaService } from '../prisma/prisma.service';
+import { trialCreateData } from '../subscriptions/farm-access-status';
+import { AuthContextCache } from '../auth/auth-context.cache';
 
 function syntheticEmailFromPhone(phone: string) {
   const digits = phone.replace(/\D/g, '');
@@ -20,9 +22,13 @@ export class MeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
+    private readonly authCache: AuthContextCache,
   ) {}
 
   async getMe(user: AuthUser) {
+    const cached = this.authCache.getMeProfile<Record<string, unknown>>(user.id);
+    if (cached) return cached;
+
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -65,7 +71,7 @@ export class MeService {
           ? 'WORKER'
           : (dbUser?.role ?? user.role ?? 'WORKER'));
 
-    return {
+    const profile = {
       id: user.id,
       email: user.email ?? dbUser?.email ?? null,
       phoneNumber: user.phoneNumber ?? dbUser?.phoneNumber ?? null,
@@ -82,6 +88,8 @@ export class MeService {
       farmIds: user.farmIds,
       supabaseSub: user.supabaseSub,
     };
+    this.authCache.setMeProfile(user.id, profile);
+    return profile;
   }
 
   async getProfileByIdentity(email?: string, phone?: string) {
@@ -300,6 +308,7 @@ export class MeService {
         location: '',
         capacity: 0,
         userId: newUser.id,
+        ...trialCreateData(),
       },
     });
 
@@ -330,6 +339,9 @@ export class MeService {
         capacity: true,
         userId: true,
         subscriptionTier: true,
+        masterLicenseStatus: true,
+        trialStartedAt: true,
+        trialExpiresAt: true,
         createdAt: true,
         updatedAt: true,
       },

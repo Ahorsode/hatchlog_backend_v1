@@ -12,6 +12,7 @@ import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthUser, JwtPayload } from './auth.types';
 import type { Env } from '../config/env.schema';
+import { AuthContextCache } from './auth-context.cache';
 
 /**
  * Accepts either:
@@ -29,6 +30,7 @@ export class SupabaseAuthGuard implements CanActivate {
     private readonly config: ConfigService<Env, true>,
     private readonly prisma: PrismaService,
     private readonly reflector: Reflector,
+    private readonly authCache: AuthContextCache,
   ) {
     const supabaseUrl = this.config
       .get('SUPABASE_URL', { infer: true })
@@ -65,6 +67,12 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     const payload = await this.verifySupabaseToken(token);
+    const cacheKey = `jwt:${payload.sub}`;
+    const cached = this.authCache.getAuthUser(cacheKey);
+    if (cached) {
+      request.user = cached;
+      return true;
+    }
 
     const email = payload.email?.trim().toLowerCase() || null;
     const phone = payload.phone?.trim() || null;
@@ -94,6 +102,7 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     request.user = this.toAuthUser(user, payload.sub);
+    this.authCache.setAuthUser(cacheKey, request.user);
     return true;
   }
 
@@ -147,6 +156,12 @@ export class SupabaseAuthGuard implements CanActivate {
       );
     }
 
+    const cacheKey = `apikey:${userId}`;
+    const cached = this.authCache.getAuthUser(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -159,7 +174,9 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('User not found for API key auth');
     }
 
-    return this.toAuthUser(user, `api-key:${user.id}`);
+    const authUser = this.toAuthUser(user, `api-key:${user.id}`);
+    this.authCache.setAuthUser(cacheKey, authUser);
+    return authUser;
   }
 
   private toAuthUser(

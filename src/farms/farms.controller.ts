@@ -6,6 +6,7 @@ import {
 } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { AllowWhenFarmLocked } from '../common/decorators/allow-when-farm-locked.decorator';
 import {
   OnboardFarmDto,
   UpdateFarmDto,
@@ -21,6 +22,7 @@ export class FarmsController {
   constructor(private readonly farmsService: FarmsService) {}
 
   @Post('onboard')
+  @AllowWhenFarmLocked()
   @ApiOkResponse({
     description:
       'Complete farm onboarding (update placeholder farm or create one)',

@@ -902,16 +902,6 @@ export class AdminService {
         },
       });
 
-      await tx.deviceRegistration.updateMany({
-        where: { farmId },
-        data: {
-          status: 'ACTIVE',
-          licenseExpiresAt: periodEnd,
-          lastPaymentAt: new Date(),
-          isActive: true,
-        },
-      });
-
       await tx.subscriptionEvent.create({
         data: {
           farmId,
@@ -953,10 +943,7 @@ export class AdminService {
 
       if (!farm) throw new NotFoundException('Farm not found');
 
-      if (
-        farm.subscriptionTier !== 'BASIC' ||
-        isPaidMasterStatus(farm.masterLicenseStatus)
-      ) {
+      if (isPaidMasterStatus(farm.masterLicenseStatus)) {
         throw new BadRequestException(
           'Paid farms cannot receive a trial extension',
         );
@@ -971,19 +958,11 @@ export class AdminService {
       await tx.farm.update({
         where: { id: farmId },
         data: {
+          subscriptionTier: 'STANDARD',
           masterLicenseStatus: 'CLOUD_TRIAL',
           trialStartedAt: farm.trialStartedAt ?? now,
           trialExpiresAt,
           trialExhaustedAt: null,
-        },
-      });
-
-      await tx.deviceRegistration.updateMany({
-        where: { farmId },
-        data: {
-          status: 'CLOUD_TRIAL',
-          licenseExpiresAt: trialExpiresAt,
-          isActive: true,
         },
       });
 
@@ -1020,15 +999,6 @@ export class AdminService {
         select: { userId: true },
       });
 
-      const deviceResult = await tx.deviceRegistration.updateMany({
-        where: { farmId },
-        data: {
-          status: 'EXPIRED',
-          licenseExpiresAt: now,
-          isActive: false,
-        },
-      });
-
       await tx.subscriptionEvent.create({
         data: {
           farmId,
@@ -1038,7 +1008,6 @@ export class AdminService {
             adminId: admin.id,
             adminUsername: admin.username,
             revokedAt: now.toISOString(),
-            deviceCount: deviceResult.count,
           },
         },
       });

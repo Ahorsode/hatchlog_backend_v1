@@ -11,6 +11,7 @@ import {
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequireEntitlement } from '../common/decorators/require-entitlement.decorator';
 import { RequireFarmPermission } from '../common/decorators/require-farm-permission.decorator';
 import {
   CreateCustomerDto,
@@ -22,6 +23,7 @@ import { CustomersService } from './customers.service';
 @ApiTags('customers')
 @ApiBearerAuth()
 @Controller('api/v1/customers')
+@RequireEntitlement('CRM')
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
