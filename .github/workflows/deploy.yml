@@ -15,6 +15,10 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          # Required when DROPLET_SSH_KEY was created with a passphrase.
+          # Prefer a dedicated deploy key with no passphrase (see README).
+          passphrase: ${{ secrets.DROPLET_SSH_KEY_PASSPHRASE }}
+          command_timeout: 15m
           script: |
             set -e
             cd ~/hatchlog_backend_v1
