@@ -15,28 +15,15 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          # Required when DROPLET_SSH_KEY was created with a passphrase.
-          # Prefer a dedicated deploy key with no passphrase (see README).
           passphrase: ${{ secrets.DROPLET_SSH_KEY_PASSPHRASE }}
-          command_timeout: 15m
+          command_timeout: 25m
           script: |
             set -e
-            export NVM_DIR="$HOME/.nvm"
-            if [ -s "$NVM_DIR/nvm.sh" ]; then
-              . "$NVM_DIR/nvm.sh"
-            fi
-            if ! command -v npm >/dev/null 2>&1; then
-              if [ -s "$HOME/.bashrc" ]; then . "$HOME/.bashrc"; fi
-            fi
-            if ! command -v npm >/dev/null 2>&1; then
-              if [ -s "$HOME/.profile" ]; then . "$HOME/.profile"; fi
-            fi
+            unset NODE_OPTIONS
             export PATH="$PATH:/usr/local/bin:$HOME/.local/bin"
             hash -r || true
-            command -v node
-            command -v npm
-            command -v pm2
-            # Exit 137 = OOM. Ensure swap exists on small droplets.
+
+            # Exit 137 = OOM. Keep swap on the 1GB droplet.
             if ! swapon --show | grep -q .; then
               if [ ! -f /swapfile ]; then
                 fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
@@ -46,36 +33,52 @@ jobs:
               swapon /swapfile || true
             fi
             free -h
+
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "Installing Docker..."
+              curl -fsSL https://get.docker.com | sh
+            fi
+            systemctl enable --now docker >/dev/null 2>&1 || service docker start || true
+
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE="docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE="docker-compose"
+            else
+              echo "ERROR: docker compose is not installed."
+              exit 1
+            fi
+
             cd ~/hatchlog_backend_v1
             git pull origin master
-            # Load .env into this SSH shell so `pm2 restart --update-env` does not
-            # replace the process env with a secret-less GitHub Actions environment.
-            if [ -f .env ]; then
-              set -a
-              . ./.env
-              set +a
+
+            if [ ! -f .env ]; then
+              echo "ERROR: ~/hatchlog_backend_v1/.env is missing. Compose will not start without it."
+              exit 1
             fi
-            # --env-file is not allowed in NODE_OPTIONS (Node rejects the process).
-            export NODE_OPTIONS="--max-old-space-size=768"
-            # Build while the current process keeps serving. Do not stop the API first:
-            # set -e would leave the API down if npm ci / prisma / build fails.
-            npm ci --no-audit --no-fund
-            npx prisma generate
-            npm run build
-            # Worker at 100% CPU starves Nest bootstrap on a 1-vCPU droplet.
-            # Stop it only after the build succeeds, then bring the API up first.
-            pm2 stop hatchlog-worker || true
+
             if command -v redis-cli >/dev/null 2>&1; then
               if ! redis-cli ping >/dev/null 2>&1; then
-                echo "WARNING: Redis is not responding on REDIS_URL. Attempting start..."
+                echo "Starting host Redis..."
                 (systemctl start redis-server || service redis-server start || true) >/dev/null 2>&1 || true
               fi
-              redis-cli ping || echo "WARNING: Redis still down — API will start, worker will back off."
+              redis-cli ping || echo "WARNING: Redis did not respond. Worker jobs will back off."
             fi
-            pm2 restart hatchlog-api --update-env
-            HEALTH_PORT="${PORT:-3001}"
-            HEALTH_URL="http://127.0.0.1:${HEALTH_PORT}/health"
-            echo "Waiting for ${HEALTH_URL} after pm2 restart..."
+
+            # Build images first so a failed build leaves the current process (pm2 or containers) serving.
+            $COMPOSE -f docker-compose.prod.yml build
+
+            # Free :3001 only after images exist.
+            if command -v pm2 >/dev/null 2>&1; then
+              pm2 delete hatchlog-api hatchlog-worker || true
+              pm2 save || true
+            fi
+            # Host Redis stays; do not start the local compose Redis service.
+
+            $COMPOSE -f docker-compose.prod.yml up -d --no-build --remove-orphans
+
+            HEALTH_URL="http://127.0.0.1:3001/health"
+            echo "Waiting for ${HEALTH_URL}..."
             HEALTH_OK=0
             ATTEMPT=0
             while [ "$ATTEMPT" -lt 20 ]; do
@@ -89,16 +92,12 @@ jobs:
               sleep 3
             done
             if [ "$HEALTH_OK" -ne 1 ]; then
-              echo "ERROR: hatchlog-api did not become healthy at ${HEALTH_URL} within ~60s after pm2 restart."
-              echo "--- pm2 status ---"
-              pm2 status || true
-              echo "--- hatchlog-api logs (no secrets) ---"
-              pm2 logs hatchlog-api --lines 80 --nostream || true
-              echo "--- listening sockets ---"
-              (ss -lntp || netstat -lntp || true) 2>/dev/null || true
-              pm2 restart hatchlog-worker --update-env || true
-              pm2 save || true
+              echo "ERROR: hatchlog-api did not become healthy at ${HEALTH_URL} within ~60s."
+              $COMPOSE -f docker-compose.prod.yml ps || true
+              echo "--- api logs ---"
+              $COMPOSE -f docker-compose.prod.yml logs --tail=80 api || true
+              echo "--- worker logs ---"
+              $COMPOSE -f docker-compose.prod.yml logs --tail=40 worker || true
               exit 1
             fi
-            pm2 restart hatchlog-worker --update-env
-            pm2 save
+            $COMPOSE -f docker-compose.prod.yml ps

@@ -3,5 +3,7 @@ dist
 coverage
 .env
 .git
+.github
 *.log
 npm-debug.log*
+deploy-check.txt

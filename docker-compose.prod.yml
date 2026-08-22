@@ -1,0 +1,47 @@
+# Droplet runtime. Uses the host Redis already listening on :6379.
+# Local dev still uses docker-compose.yml (api + worker + Redis).
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      NODE_OPTIONS: --max-old-space-size=384
+      REDIS_URL: redis://127.0.0.1:6379
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    mem_limit: 400m
+    cpus: 0.7
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=192
+      REDIS_URL: redis://127.0.0.1:6379
+    network_mode: host
+    init: true
+    restart: unless-stopped
+    mem_limit: 220m
+    cpus: 0.3

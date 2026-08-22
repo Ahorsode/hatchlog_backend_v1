@@ -37,6 +37,16 @@ Docker Compose (API + worker + Redis):
 docker compose up --build
 ```
 
+Production droplet (replaces PM2):
+
+```bash
+# host Redis must already be running (redis-cli ping)
+docker compose -f docker-compose.prod.yml up -d --build
+curl -fsS http://127.0.0.1:3001/health
+```
+
+GitHub Actions deploys with `docker-compose.prod.yml`. Containers read `~/hatchlog_backend_v1/.env` and use the host Redis on `:6379`.
+
 ## Sync API (v1)
 
 `POST /api/v1/sync/push` — batched mutations with idempotent `client_id`  
