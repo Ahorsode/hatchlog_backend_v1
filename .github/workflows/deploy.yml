@@ -21,6 +21,21 @@ jobs:
           command_timeout: 15m
           script: |
             set -e
+            export NVM_DIR="$HOME/.nvm"
+            if [ -s "$NVM_DIR/nvm.sh" ]; then
+              . "$NVM_DIR/nvm.sh"
+            fi
+            if ! command -v npm >/dev/null 2>&1; then
+              if [ -s "$HOME/.bashrc" ]; then . "$HOME/.bashrc"; fi
+            fi
+            if ! command -v npm >/dev/null 2>&1; then
+              if [ -s "$HOME/.profile" ]; then . "$HOME/.profile"; fi
+            fi
+            export PATH="$PATH:/usr/local/bin:$HOME/.local/bin"
+            hash -r || true
+            command -v node
+            command -v npm
+            command -v pm2
             cd ~/hatchlog_backend_v1
             git pull origin master
             npm ci
