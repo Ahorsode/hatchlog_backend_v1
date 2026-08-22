@@ -15,4 +15,9 @@ export type JwtPayload = {
   aud?: string;
   exp?: number;
   iat?: number;
+  user_metadata?: {
+    email?: string;
+    full_name?: string;
+    name?: string;
+  };
 };

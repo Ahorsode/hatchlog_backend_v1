@@ -74,7 +74,10 @@ export class SupabaseAuthGuard implements CanActivate {
       return true;
     }
 
-    const email = payload.email?.trim().toLowerCase() || null;
+    const email =
+      payload.email?.trim().toLowerCase() ||
+      payload.user_metadata?.email?.trim().toLowerCase() ||
+      null;
     const phone = payload.phone?.trim() || null;
     const identityFilters = [
       ...(email ? [{ email }] : []),

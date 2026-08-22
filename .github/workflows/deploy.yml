@@ -48,11 +48,30 @@ jobs:
             free -h
             cd ~/hatchlog_backend_v1
             git pull origin master
-            # Free RAM while installing/building (brief downtime).
-            pm2 stop hatchlog-api hatchlog-worker || true
+            # Build while the current process keeps serving. Do not stop pm2 first:
+            # set -e would leave the API down if npm ci / prisma / build fails.
             export NODE_OPTIONS="--max-old-space-size=768"
             npm ci --no-audit --no-fund
             npx prisma generate
             npm run build
             pm2 restart hatchlog-api hatchlog-worker --update-env
             pm2 save
+            HEALTH_PORT="${PORT:-3001}"
+            HEALTH_URL="http://localhost:${HEALTH_PORT}/health"
+            echo "Waiting for ${HEALTH_URL} after pm2 restart..."
+            HEALTH_OK=0
+            ATTEMPT=0
+            while [ "$ATTEMPT" -lt 10 ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+              if HEALTH_BODY=$(curl -fsS --max-time 3 "$HEALTH_URL"); then
+                echo "Health check passed on attempt ${ATTEMPT}: ${HEALTH_BODY}"
+                HEALTH_OK=1
+                break
+              fi
+              echo "Health check attempt ${ATTEMPT}/10 failed; retrying in 3s..."
+              sleep 3
+            done
+            if [ "$HEALTH_OK" -ne 1 ]; then
+              echo "ERROR: hatchlog-api did not become healthy at ${HEALTH_URL} within ~30s after pm2 restart. The deploy is treated as failed."
+              exit 1
+            fi

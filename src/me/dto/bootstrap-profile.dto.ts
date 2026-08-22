@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString } from 'class-validator';
 
 export class BootstrapProfileDto {
   @ApiPropertyOptional()
@@ -15,7 +15,6 @@ export class BootstrapProfileDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MinLength(1)
   firstname?: string;
 
   @ApiPropertyOptional()
