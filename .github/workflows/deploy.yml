@@ -48,30 +48,57 @@ jobs:
             free -h
             cd ~/hatchlog_backend_v1
             git pull origin master
-            # Build while the current process keeps serving. Do not stop pm2 first:
-            # set -e would leave the API down if npm ci / prisma / build fails.
+            # Load .env into this SSH shell so `pm2 restart --update-env` does not
+            # replace the process env with a secret-less GitHub Actions environment.
+            if [ -f .env ]; then
+              set -a
+              . ./.env
+              set +a
+            fi
+            # --env-file is not allowed in NODE_OPTIONS (Node rejects the process).
             export NODE_OPTIONS="--max-old-space-size=768"
+            # Build while the current process keeps serving. Do not stop the API first:
+            # set -e would leave the API down if npm ci / prisma / build fails.
             npm ci --no-audit --no-fund
             npx prisma generate
             npm run build
-            pm2 restart hatchlog-api hatchlog-worker --update-env
-            pm2 save
+            # Worker at 100% CPU starves Nest bootstrap on a 1-vCPU droplet.
+            # Stop it only after the build succeeds, then bring the API up first.
+            pm2 stop hatchlog-worker || true
+            if command -v redis-cli >/dev/null 2>&1; then
+              if ! redis-cli ping >/dev/null 2>&1; then
+                echo "WARNING: Redis is not responding on REDIS_URL. Attempting start..."
+                (systemctl start redis-server || service redis-server start || true) >/dev/null 2>&1 || true
+              fi
+              redis-cli ping || echo "WARNING: Redis still down — API will start, worker will back off."
+            fi
+            pm2 restart hatchlog-api --update-env
             HEALTH_PORT="${PORT:-3001}"
-            HEALTH_URL="http://localhost:${HEALTH_PORT}/health"
+            HEALTH_URL="http://127.0.0.1:${HEALTH_PORT}/health"
             echo "Waiting for ${HEALTH_URL} after pm2 restart..."
             HEALTH_OK=0
             ATTEMPT=0
-            while [ "$ATTEMPT" -lt 10 ]; do
+            while [ "$ATTEMPT" -lt 20 ]; do
               ATTEMPT=$((ATTEMPT + 1))
               if HEALTH_BODY=$(curl -fsS --max-time 3 "$HEALTH_URL"); then
                 echo "Health check passed on attempt ${ATTEMPT}: ${HEALTH_BODY}"
                 HEALTH_OK=1
                 break
               fi
-              echo "Health check attempt ${ATTEMPT}/10 failed; retrying in 3s..."
+              echo "Health check attempt ${ATTEMPT}/20 failed; retrying in 3s..."
               sleep 3
             done
             if [ "$HEALTH_OK" -ne 1 ]; then
-              echo "ERROR: hatchlog-api did not become healthy at ${HEALTH_URL} within ~30s after pm2 restart. The deploy is treated as failed."
+              echo "ERROR: hatchlog-api did not become healthy at ${HEALTH_URL} within ~60s after pm2 restart."
+              echo "--- pm2 status ---"
+              pm2 status || true
+              echo "--- hatchlog-api logs (no secrets) ---"
+              pm2 logs hatchlog-api --lines 80 --nostream || true
+              echo "--- listening sockets ---"
+              (ss -lntp || netstat -lntp || true) 2>/dev/null || true
+              pm2 restart hatchlog-worker --update-env || true
+              pm2 save || true
               exit 1
             fi
+            pm2 restart hatchlog-worker --update-env
+            pm2 save

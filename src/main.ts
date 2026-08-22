@@ -1,3 +1,4 @@
+import './load-env';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -31,11 +32,14 @@ async function bootstrap() {
 
   const config = app.get(ConfigService<Env, true>);
   const port = config.get('PORT', { infer: true });
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   const logger = new Logger('Bootstrap');
-  logger.log(`HatchLog API listening on http://localhost:${port}`);
+  logger.log(`HatchLog API listening on http://0.0.0.0:${port}`);
   logger.log(`OpenAPI docs at http://localhost:${port}/docs`);
 }
 
-void bootstrap();
+void bootstrap().catch((error) => {
+  console.error('HatchLog API bootstrap failed:', error);
+  process.exit(1);
+});

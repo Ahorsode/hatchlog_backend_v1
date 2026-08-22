@@ -11,5 +11,12 @@ export function redisConnectionFromUrl(redisUrl: string) {
     username: parsed.username || undefined,
     password: parsed.password || undefined,
     db: Number.isFinite(db) ? db : 0,
+    // BullMQ requires null; a number makes the worker throw/reconnect in a tight loop.
+    maxRetriesPerRequest: null,
+    enableOfflineQueue: false,
+    retryStrategy(times: number) {
+      // Missing Redis must not pin a 1-vCPU droplet at 100% CPU.
+      return Math.min(200 * times, 5000);
+    },
   };
 }

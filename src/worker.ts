@@ -1,3 +1,4 @@
+import './load-env';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { WorkerAppModule } from './worker-app.module';
@@ -19,4 +20,7 @@ async function bootstrap() {
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
-void bootstrap();
+void bootstrap().catch((error) => {
+  console.error('HatchLog worker bootstrap failed:', error);
+  process.exit(1);
+});
