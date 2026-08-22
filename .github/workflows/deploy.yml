@@ -36,9 +36,22 @@ jobs:
             command -v node
             command -v npm
             command -v pm2
+            # Exit 137 = OOM. Ensure swap exists on small droplets.
+            if ! swapon --show | grep -q .; then
+              if [ ! -f /swapfile ]; then
+                fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+                chmod 600 /swapfile
+                mkswap /swapfile
+              fi
+              swapon /swapfile || true
+            fi
+            free -h
             cd ~/hatchlog_backend_v1
             git pull origin master
-            npm ci
+            # Free RAM while installing/building (brief downtime).
+            pm2 stop hatchlog-api hatchlog-worker || true
+            export NODE_OPTIONS="--max-old-space-size=768"
+            npm ci --no-audit --no-fund
             npx prisma generate
             npm run build
             pm2 restart hatchlog-api hatchlog-worker --update-env
