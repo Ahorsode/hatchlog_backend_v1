@@ -12,7 +12,10 @@ import {
 } from '../common/dto/domain.dto';
 import { assertFarmAccess } from '../common/farm-access';
 import { PrismaService } from '../prisma/prisma.service';
-import { trialCreateData } from '../subscriptions/farm-access-status';
+import {
+  needsOnboardingTrial,
+  trialCreateData,
+} from '../subscriptions/farm-access-status';
 
 @Injectable()
 export class FarmsService {
@@ -49,7 +52,7 @@ export class FarmsService {
           name,
           location,
           capacity,
-          ...(owned.trialStartedAt ? {} : trialCreateData()),
+          ...(needsOnboardingTrial(owned) ? trialCreateData() : {}),
         },
       });
 

@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { BootstrapProfileDto } from './dto/bootstrap-profile.dto';
 import { PasswordBridgeDto } from './dto/password-bridge.dto';
+import { UpdateMePasswordDto, UpdateMeProfileDto } from './dto/update-me.dto';
 import { MeService } from './me.service';
 
 @ApiTags('me')
@@ -54,5 +55,23 @@ export class MeController {
   })
   bootstrapProfile(@Body() dto: BootstrapProfileDto) {
     return this.meService.bootstrapProfile(dto);
+  }
+
+  @Patch('me/profile')
+  @ApiOkResponse({ description: 'Update firstname and surname' })
+  updateProfile(
+    @CurrentUser() user: AuthUser,
+    @Body() body: UpdateMeProfileDto,
+  ) {
+    return this.meService.updateProfile(user, body);
+  }
+
+  @Patch('me/password')
+  @ApiOkResponse({ description: 'Update password and clear first-login flag' })
+  updatePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() body: UpdateMePasswordDto,
+  ) {
+    return this.meService.updatePassword(user, body);
   }
 }

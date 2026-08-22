@@ -1,5 +1,6 @@
 import {
   hasEntitlement,
+  needsOnboardingTrial,
   resolveFarmAccess,
   trialCreateData,
 } from './farm-access-status';
@@ -90,5 +91,35 @@ describe('resolveFarmAccess', () => {
 
     expect(access.status).toBe('paid');
     expect(hasEntitlement(access, 'CRM')).toBe(true);
+  });
+
+  it('starts a trial for placeholder and NO_TRIAL farms, not for paid farms', () => {
+    expect(
+      needsOnboardingTrial({
+        capacity: 0,
+        location: '',
+        masterLicenseStatus: 'NO_TRIAL',
+        trialStartedAt: null,
+        trialExpiresAt: null,
+      }),
+    ).toBe(true);
+    expect(
+      needsOnboardingTrial({
+        capacity: 7000,
+        location: 'man',
+        masterLicenseStatus: 'CLOUD_TRIAL',
+        trialStartedAt: now,
+        trialExpiresAt: new Date('2026-09-19T12:00:00.000Z'),
+      }),
+    ).toBe(false);
+    expect(
+      needsOnboardingTrial({
+        capacity: 7000,
+        location: 'man',
+        masterLicenseStatus: 'PAID_STANDARD',
+        trialStartedAt: now,
+        trialExpiresAt: new Date('2027-01-01T00:00:00.000Z'),
+      }),
+    ).toBe(false);
   });
 });

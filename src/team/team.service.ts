@@ -13,13 +13,20 @@ import {
   UpdatePermissionsDto,
 } from '../common/dto/domain.dto';
 import { assertFarmAccess } from '../common/farm-access';
+import { normalizePhoneNumber } from '../common/phone';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthContextCache } from '../auth/auth-context.cache';
+import { MeService } from '../me/me.service';
 import {
   normalizeTier,
   resolveFarmAccess,
   WORKER_LIMITS,
 } from '../subscriptions/farm-access-status';
+import { WORKER_PLACEHOLDER_PASSWORD } from './team.constants';
+import {
+  invitationPhoneConflictError,
+  provisionWorkerMembership,
+} from './team-provisioning';
 
 const ALLOWED_ROLES = new Set<string>([
   'MANAGER',
@@ -34,6 +41,7 @@ export class TeamService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authCache: AuthContextCache,
+    private readonly meService: MeService,
   ) {}
 
   private async assertOwnerOrManager(user: AuthUser, farmId: string) {
@@ -121,7 +129,7 @@ export class TeamService {
     const limit = WORKER_LIMITS[tier];
     const nonOwnerMembers = members.filter((member) => member.role !== 'OWNER')
       .length;
-    const currentSeats = nonOwnerMembers + invitations.length;
+    const currentSeats = nonOwnerMembers;
 
     let currentUserRole = 'WORKER';
     if (farm?.userId === user.id) {
@@ -162,18 +170,12 @@ export class TeamService {
 
     const accessSnapshot = resolveFarmAccess(farm);
     const limit = WORKER_LIMITS[accessSnapshot.tier];
-    const [nonOwnerMembers, pendingInvites] = await Promise.all([
-      this.prisma.farmMember.count({
-        where: { farmId, NOT: { role: 'OWNER' } },
-      }),
-      this.prisma.invitation.count({
-        where: { farmId, status: 'PENDING' },
-      }),
-    ]);
-    const current = nonOwnerMembers + pendingInvites;
-    if (current >= limit) {
+    const nonOwnerMembers = await this.prisma.farmMember.count({
+      where: { farmId, NOT: { role: 'OWNER' } },
+    });
+    if (nonOwnerMembers >= limit) {
       throw new BadRequestException(
-        `Worker limit reached (${current}/${limit}). Upgrade your plan to invite more staff.`,
+        `Worker limit reached (${nonOwnerMembers}/${limit}). Upgrade your plan to invite more staff.`,
       );
     }
   }
@@ -183,41 +185,65 @@ export class TeamService {
     await this.assertOwnerOrManager(user, dto.farm_id);
     await this.assertWorkerSeatAvailable(dto.farm_id);
 
-    if (!dto.email && !dto.phoneNumber) {
+    const email = dto.email?.toLowerCase().trim() || null;
+    const phone = normalizePhoneNumber(dto.phoneNumber);
+    if (!email && !phone) {
       throw new BadRequestException('Provide either email or phoneNumber');
     }
     if (!ALLOWED_ROLES.has(dto.role)) {
       throw new BadRequestException('Invalid role');
     }
 
-    const orConditions: Record<string, string>[] = [];
-    if (dto.email) orConditions.push({ email: dto.email.toLowerCase() });
-    if (dto.phoneNumber) orConditions.push({ phoneNumber: dto.phoneNumber });
+    const role = dto.role as Role;
 
-    const existing = await this.prisma.invitation.findFirst({
-      where: { farmId: dto.farm_id, OR: orConditions },
-    });
-
-    if (existing?.status === 'ACCEPTED') {
-      throw new BadRequestException('This user is already a farm member');
+    let provisioned;
+    try {
+      provisioned = await this.prisma.$transaction((tx) =>
+        provisionWorkerMembership(tx, {
+          farmId: dto.farm_id,
+          email,
+          phone,
+          role,
+          permissions: dto.permissions,
+        }),
+      );
+    } catch (error) {
+      if (invitationPhoneConflictError(error)) {
+        throw new BadRequestException(
+          'This phone number already has an account on another farm',
+        );
+      }
+      throw error;
     }
 
-    if (existing) {
-      return this.prisma.invitation.update({
-        where: { id: existing.id },
-        data: { role: dto.role as Role },
+    if (provisioned.createdUser) {
+      await this.meService.ensureSupabaseLogin({
+        email: provisioned.loginEmail as string,
+        password: WORKER_PLACEHOLDER_PASSWORD,
+        phoneNumber: provisioned.phoneNumber,
+        prismaUserId: provisioned.userId,
+        firstname: provisioned.firstname,
+        surname: provisioned.surname,
+      });
+    } else if (provisioned.mustChangePassword && provisioned.loginEmail) {
+      await this.meService.ensureSupabaseLogin({
+        email: provisioned.loginEmail,
+        password: WORKER_PLACEHOLDER_PASSWORD,
+        phoneNumber: provisioned.phoneNumber,
+        prismaUserId: provisioned.userId,
+        firstname: provisioned.firstname,
+        surname: provisioned.surname,
       });
     }
 
-    return this.prisma.invitation.create({
-      data: {
-        farmId: dto.farm_id,
-        email: dto.email?.toLowerCase() ?? null,
-        phoneNumber: dto.phoneNumber ?? null,
-        role: dto.role as Role,
-        status: 'PENDING',
-      },
-    });
+    this.authCache.invalidateUser(provisioned.userId);
+
+    return {
+      ...provisioned.invitation,
+      userId: provisioned.userId,
+      createdUser: provisioned.createdUser,
+      mustChangePassword: provisioned.mustChangePassword,
+    };
   }
 
   async deleteInvitation(user: AuthUser, invitationId: string, farmId: string) {

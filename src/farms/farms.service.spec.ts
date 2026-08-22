@@ -51,13 +51,17 @@ describe('FarmsService.onboard', () => {
     ).toBe(30);
   });
 
-  it('sets trial fields when onboarding a placeholder farm without a clock', async () => {
+  it('starts a trial when onboarding a placeholder with schema NO_TRIAL defaults', async () => {
     const farmUpdate = jest.fn().mockResolvedValue({ id: 'farm_1' });
     const prisma = {
       farm: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'farm_1',
+          capacity: 0,
+          location: '',
+          masterLicenseStatus: 'NO_TRIAL',
           trialStartedAt: null,
+          trialExpiresAt: null,
         }),
         update: farmUpdate,
       },
@@ -68,9 +72,9 @@ describe('FarmsService.onboard', () => {
     const service = new FarmsService(prisma as never);
 
     await service.onboard(user, {
-      name: 'Green Farm',
-      location: 'Accra',
-      capacity: 500,
+      name: 'boi',
+      location: 'man',
+      capacity: 7000,
     });
 
     const updateCalls = farmUpdate.mock.calls as unknown as Array<
@@ -79,6 +83,8 @@ describe('FarmsService.onboard', () => {
           data: {
             subscriptionTier: string;
             masterLicenseStatus: string;
+            trialStartedAt: Date;
+            trialExpiresAt: Date;
           };
         },
       ]
@@ -86,5 +92,7 @@ describe('FarmsService.onboard', () => {
     const data = updateCalls[0][0].data;
     expect(data.subscriptionTier).toBe('STANDARD');
     expect(data.masterLicenseStatus).toBe('CLOUD_TRIAL');
+    expect(data.trialStartedAt).toBeInstanceOf(Date);
+    expect(data.trialExpiresAt).toBeInstanceOf(Date);
   });
 });

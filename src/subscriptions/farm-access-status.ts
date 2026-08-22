@@ -89,6 +89,26 @@ export function trialCreateData(now = new Date()) {
   };
 }
 
+/** True when onboarding should start a 30-day STANDARD trial clock. */
+export function needsOnboardingTrial(farm: {
+  capacity?: number;
+  location?: string | null;
+  masterLicenseStatus?: string | null;
+  trialStartedAt?: Date | null;
+  trialExpiresAt?: Date | null;
+}) {
+  if (isPaidMasterStatus(farm.masterLicenseStatus)) return false;
+
+  const isPlaceholder =
+    (farm.capacity ?? 0) === 0 && !(farm.location ?? '').trim();
+  if (isPlaceholder) return true;
+
+  const master = (farm.masterLicenseStatus ?? '').toUpperCase();
+  if (!master || master === 'NO_TRIAL') return true;
+  if (!farm.trialStartedAt || !farm.trialExpiresAt) return true;
+  return false;
+}
+
 export function normalizeTier(
   tier: string | null | undefined,
 ): FarmAccessSnapshot['tier'] {

@@ -11,10 +11,37 @@ import type { Env } from '../config/env.schema';
 import { PrismaService } from '../prisma/prisma.service';
 import { trialCreateData } from '../subscriptions/farm-access-status';
 import { AuthContextCache } from '../auth/auth-context.cache';
+import { passwordPolicyError } from '../common/password-policy';
+import {
+  buildPhoneLookupCandidates,
+  normalizePhoneNumber,
+  syntheticEmailFromPhone,
+} from '../common/phone';
+import type { UpdateMePasswordDto, UpdateMeProfileDto } from './dto/update-me.dto';
 
-function syntheticEmailFromPhone(phone: string) {
-  const digits = phone.replace(/\D/g, '');
-  return `phone.${digits}@users.hatchlog.local`;
+function isPlaceholderFarm(farm: {
+  capacity: number;
+  location: string | null;
+}) {
+  return farm.capacity === 0 && !(farm.location ?? '').trim();
+}
+
+function pickActiveFarmId(
+  owned: Array<{ id: string; capacity: number; location: string | null }>,
+  memberFarms: Array<{ id: string; capacity: number; location: string | null }>,
+): string | null {
+  const seen = new Set<string>();
+  const all: Array<{
+    id: string;
+    capacity: number;
+    location: string | null;
+  }> = [];
+  for (const farm of [...owned, ...memberFarms]) {
+    if (seen.has(farm.id)) continue;
+    seen.add(farm.id);
+    all.push(farm);
+  }
+  return all.find((farm) => !isPlaceholderFarm(farm))?.id ?? all[0]?.id ?? null;
 }
 
 @Injectable()
@@ -44,14 +71,24 @@ export class MeService {
         sessionVersion: true,
         securityNotice: true,
         securityRevokedAt: true,
-        farms: { select: { id: true } },
-        memberships: { select: { farmId: true, role: true } },
+        farms: { select: { id: true, capacity: true, location: true } },
+        memberships: {
+          select: {
+            farmId: true,
+            role: true,
+            farm: { select: { id: true, capacity: true, location: true } },
+          },
+        },
         userPermissions: true,
       },
     });
 
-    const activeFarmId =
-      dbUser?.farms[0]?.id ?? dbUser?.memberships[0]?.farmId ?? null;
+    const activeFarmId = pickActiveFarmId(
+      dbUser?.farms ?? [],
+      (dbUser?.memberships ?? [])
+        .map((membership) => membership.farm)
+        .filter((farm): farm is NonNullable<typeof farm> => Boolean(farm)),
+    );
 
     const membership = activeFarmId
       ? dbUser?.memberships.find((m) => m.farmId === activeFarmId)
@@ -95,9 +132,15 @@ export class MeService {
   }
 
   async getProfileByIdentity(email?: string, phone?: string) {
-    const filters: Array<{ email: string } | { phoneNumber: string }> = [];
+    const filters: Array<{ email: string } | { phoneNumber: { in: string[] } }> =
+      [];
     if (email) filters.push({ email: email.toLowerCase().trim() });
-    if (phone) filters.push({ phoneNumber: phone.trim() });
+    if (phone) {
+      const candidates = buildPhoneLookupCandidates(phone);
+      if (candidates.length > 0) {
+        filters.push({ phoneNumber: { in: candidates } });
+      }
+    }
     if (filters.length === 0) return null;
 
     return this.prisma.user.findFirst({
@@ -125,12 +168,7 @@ export class MeService {
     const user = await this.prisma.user.findFirst({
       where: isEmail
         ? { email: trimmed.toLowerCase() }
-        : {
-            OR: [
-              { phoneNumber: trimmed },
-              { phoneNumber: trimmed.replace(/\s+/g, '') },
-            ],
-          },
+        : { phoneNumber: { in: buildPhoneLookupCandidates(trimmed) } },
     });
 
     if (!user?.password) {
@@ -157,7 +195,7 @@ export class MeService {
       });
     }
 
-    await this.syncSupabaseAuthUser({
+    await this.ensureSupabaseLogin({
       email,
       password,
       phoneNumber: user.phoneNumber,
@@ -174,6 +212,17 @@ export class MeService {
       surname: user.surname,
       phoneNumber: user.phoneNumber,
     };
+  }
+
+  async ensureSupabaseLogin(input: {
+    email: string;
+    password: string;
+    phoneNumber: string | null;
+    prismaUserId: string;
+    firstname: string | null;
+    surname: string | null;
+  }) {
+    return this.syncSupabaseAuthUser(input);
   }
 
   private async syncSupabaseAuthUser(input: {
@@ -269,12 +318,20 @@ export class MeService {
     passwordHash?: string;
   }) {
     const email = data.email?.toLowerCase().trim() ?? null;
-    const phone = data.phoneNumber?.trim() ?? null;
+    const phone = normalizePhoneNumber(data.phoneNumber) ?? data.phoneNumber?.trim() ?? null;
 
-    const identityFilters: Array<{ email: string } | { phoneNumber: string }> =
-      [];
+    const identityFilters: Array<
+      { email: string } | { phoneNumber: { in: string[] } }
+    > = [];
     if (email) identityFilters.push({ email });
-    if (phone) identityFilters.push({ phoneNumber: phone });
+    if (data.phoneNumber || phone) {
+      const candidates = buildPhoneLookupCandidates(
+        data.phoneNumber || phone || '',
+      );
+      if (candidates.length > 0) {
+        identityFilters.push({ phoneNumber: { in: candidates } });
+      }
+    }
     if (identityFilters.length === 0) {
       throw new BadRequestException('email or phoneNumber is required');
     }
@@ -329,6 +386,82 @@ export class MeService {
     return { userId: newUser.id, farmId: farm.id, created: true };
   }
 
+  async updateProfile(user: AuthUser, dto: UpdateMeProfileDto) {
+    const firstname = dto.firstname.trim();
+    const surname = dto.surname.trim();
+    if (!firstname || !surname) {
+      throw new BadRequestException('firstname and surname are required');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { firstname, surname },
+      select: {
+        id: true,
+        firstname: true,
+        surname: true,
+        email: true,
+        phoneNumber: true,
+      },
+    });
+    this.authCache.invalidateUser(user.id);
+    return updated;
+  }
+
+  async updatePassword(user: AuthUser, dto: UpdateMePasswordDto) {
+    const nextPassword = (dto.newPassword || dto.new || '').trim();
+    const policyError = passwordPolicyError(nextPassword);
+    if (policyError) {
+      throw new BadRequestException(policyError);
+    }
+
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+    });
+    if (!dbUser) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!dbUser.mustChangePassword) {
+      if (!dto.current) {
+        throw new BadRequestException('Current password is required');
+      }
+      const valid = await bcrypt.compare(dto.current, dbUser.password || '');
+      if (!valid) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(nextPassword, 10);
+    const email =
+      dbUser.email?.trim().toLowerCase() ||
+      (dbUser.phoneNumber ? syntheticEmailFromPhone(dbUser.phoneNumber) : null);
+    if (!email) {
+      throw new BadRequestException('User has no email or phone for auth');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: passwordHash,
+        mustChangePassword: false,
+        email: dbUser.email || email,
+      },
+    });
+
+    await this.ensureSupabaseLogin({
+      email,
+      password: nextPassword,
+      phoneNumber: dbUser.phoneNumber,
+      prismaUserId: dbUser.id,
+      firstname: dbUser.firstname,
+      surname: dbUser.surname,
+    });
+
+    this.authCache.invalidateUser(user.id);
+    return { success: true, mustChangePassword: false };
+  }
+
   async listFarms(user: AuthUser) {
     if (user.farmIds.length === 0) return [];
 
@@ -361,10 +494,17 @@ export class MeService {
       memberships.map((m) => [m.farmId, m.role] as const),
     );
 
-    return farms.map((farm) => ({
-      ...farm,
-      membershipRole:
-        farm.userId === user.id ? 'OWNER' : (roleByFarm.get(farm.id) ?? null),
-    }));
+    return farms
+      .map((farm) => ({
+        ...farm,
+        membershipRole:
+          farm.userId === user.id ? 'OWNER' : (roleByFarm.get(farm.id) ?? null),
+      }))
+      .sort((a, b) => {
+        const placeholderDelta =
+          Number(isPlaceholderFarm(a)) - Number(isPlaceholderFarm(b));
+        if (placeholderDelta !== 0) return placeholderDelta;
+        return a.name.localeCompare(b.name);
+      });
   }
 }

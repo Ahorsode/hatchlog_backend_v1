@@ -797,6 +797,12 @@ export class CreateInvitationDto {
   })
   @IsString()
   role!: string;
+
+  @ApiPropertyOptional({ type: () => UpdatePermissionsDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UpdatePermissionsDto)
+  permissions?: UpdatePermissionsDto;
 }
 
 export class UpdateMemberRoleDto {

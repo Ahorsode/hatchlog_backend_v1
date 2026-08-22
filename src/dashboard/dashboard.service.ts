@@ -283,6 +283,7 @@ export class DashboardService {
     const map = new Map<string, number>();
     for (const row of rows) {
       const key = this.toDateKey(row.day);
+      if (!key) continue;
       map.set(key, (map.get(key) || 0) + this.toNumber(row.value));
     }
     return Array.from(map.entries()).map(([day, value]) => ({
@@ -294,7 +295,9 @@ export class DashboardService {
   private buildDailySeriesFromSums(records: DaySumRow[], startDate: Date) {
     const map = new Map<string, number>();
     for (const record of records) {
-      map.set(this.toDateKey(record.day), this.toNumber(record.value));
+      const key = this.toDateKey(record.day);
+      if (!key) continue;
+      map.set(key, this.toNumber(record.value));
     }
 
     const result: { date: string; value: number }[] = [];
@@ -302,14 +305,18 @@ export class DashboardService {
     const now = new Date();
     while (cursor <= now) {
       const key = this.toDateKey(cursor);
-      result.push({ date: key, value: map.get(key) || 0 });
+      if (key) {
+        result.push({ date: key, value: map.get(key) || 0 });
+      }
       cursor.setDate(cursor.getDate() + 1);
     }
     return result;
   }
 
-  private toDateKey(value: Date | string) {
+  private toDateKey(value: Date | string | null | undefined): string | null {
+    if (value == null || value === '') return null;
     const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
     return date.toISOString().split('T')[0];
   }
 
